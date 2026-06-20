@@ -16,7 +16,6 @@ export type VideoMode = "auto" | "visual" | "thermal" | "mixed";
 
 export type AssessmentSettings = {
   fps: number;
-  maxFrames: number;
   eventSensitivity: number;
   openAiFrameLimit: number;
   processingConcurrency: number;
@@ -104,6 +103,7 @@ export type VideoAssessmentResult = {
     height: number;
     frameCount: number;
     url: string;
+    annotatedUrl?: string;
   };
   summary: string;
   damage: DamageAssessment;
@@ -117,5 +117,6 @@ export type VideoAssessmentResult = {
     ffmpeg: boolean;
     processingConcurrency: number;
     videoMode: VideoMode;
+    annotatedVideo: boolean;
   };
 };

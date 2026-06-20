@@ -71,7 +71,6 @@ type OpenAiParsedReview = {
 
 export const defaultAssessmentSettings: AssessmentSettings = {
   fps: 1,
-  maxFrames: 24,
   eventSensitivity: 0.35,
   openAiFrameLimit: 8,
   processingConcurrency: 4,
@@ -82,7 +81,6 @@ export function normalizeAssessmentSettings(input: unknown): AssessmentSettings 
   const value = typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
   return {
     fps: clampNumber(value.fps, 0.25, 5, defaultAssessmentSettings.fps),
-    maxFrames: Math.round(clampNumber(value.maxFrames, 4, 80, defaultAssessmentSettings.maxFrames)),
     eventSensitivity: clampNumber(
       value.eventSensitivity,
       0.05,
@@ -133,6 +131,12 @@ export async function readAssessmentSourceVideo(id: string) {
   return readFile(sourcePath);
 }
 
+export async function readAssessmentAnnotatedVideo(id: string) {
+  assertSafeId(id);
+  const annotatedPath = path.join(storageRoot, id, "annotated.mp4");
+  return readFile(annotatedPath);
+}
+
 async function analyzeSavedVideo(
   id: string,
   runDir: string,
@@ -164,6 +168,10 @@ async function analyzeSavedVideo(
     peopleRisk: localPeopleRisk,
     openAiReview
   });
+  result.processing.annotatedVideo = await createAnnotatedVideo(runDir, sourcePath, result.frames, settings.fps);
+  if (result.processing.annotatedVideo) {
+    result.video.annotatedUrl = `/api/video-assessments/${id}/annotated`;
+  }
 
   await writeFile(path.join(runDir, "metadata.json"), JSON.stringify(metadata, null, 2), "utf8");
   await writeFile(path.join(runDir, "result.json"), JSON.stringify(result, null, 2), "utf8");
@@ -209,8 +217,6 @@ async function extractFrames(sourcePath: string, framesDir: string, settings: As
       sourcePath,
       "-vf",
       `fps=${settings.fps},scale=${frameWidth}:-1`,
-      "-frames:v",
-      String(settings.maxFrames),
       "-q:v",
       "3",
       outputPattern
@@ -638,9 +644,127 @@ function mergeAssessment(input: {
       frameCount: input.frames.length,
       ffmpeg: true,
       processingConcurrency: input.settings.processingConcurrency,
-      videoMode: input.settings.videoMode
+      videoMode: input.settings.videoMode,
+      annotatedVideo: false
     }
   };
+}
+
+async function createAnnotatedVideo(
+  runDir: string,
+  sourcePath: string,
+  frames: VideoFrameAssessment[],
+  fps: number
+) {
+  const outputPath = path.join(runDir, "annotated.mp4");
+  const framesWithBoxes = frames.filter((frame) => frame.boxes.length > 0);
+
+  if (!framesWithBoxes.length) {
+    await copyFile(sourcePath, outputPath);
+    return false;
+  }
+
+  const labeledFilterPath = path.join(runDir, "annotated-filter-labels.txt");
+  const boxFilterPath = path.join(runDir, "annotated-filter-boxes.txt");
+
+  try {
+    await writeFile(labeledFilterPath, buildVideoFilterGraph(frames, fps, true), "utf8");
+    await runAnnotatedFfmpeg(sourcePath, outputPath, labeledFilterPath);
+    return true;
+  } catch {
+    try {
+      await writeFile(boxFilterPath, buildVideoFilterGraph(frames, fps, false), "utf8");
+      await runAnnotatedFfmpeg(sourcePath, outputPath, boxFilterPath);
+      return true;
+    } catch {
+      await copyFile(sourcePath, outputPath);
+      return false;
+    }
+  }
+}
+
+async function runAnnotatedFfmpeg(sourcePath: string, outputPath: string, filterPath: string) {
+  await execFileAsync(
+    "ffmpeg",
+    [
+      "-y",
+      "-i",
+      sourcePath,
+      "-filter_complex_script",
+      filterPath,
+      "-map",
+      "[v]",
+      "-map",
+      "0:a?",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
+      outputPath
+    ],
+    { maxBuffer: 1024 * 1024 * 16 }
+  );
+}
+
+function buildVideoFilterGraph(frames: VideoFrameAssessment[], fps: number, includeLabels: boolean) {
+  const filters: string[] = [];
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index];
+    const previous = frames[index - 1];
+    const next = frames[index + 1];
+    const halfFrameWindow = 0.5 / Math.max(0.001, fps);
+    const start =
+      previous !== undefined
+        ? (previous.timeSec + frame.timeSec) / 2
+        : Math.max(0, frame.timeSec - halfFrameWindow);
+    const end =
+      next !== undefined
+        ? (frame.timeSec + next.timeSec) / 2
+        : frame.timeSec + halfFrameWindow;
+    const enable = `between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})`;
+
+    for (const box of frame.boxes) {
+      const color = ffmpegColor(box.color);
+      const x = normalizedExpr("iw", box.x);
+      const y = normalizedExpr("ih", box.y);
+      const w = normalizedExpr("iw", box.width);
+      const h = normalizedExpr("ih", box.height);
+      filters.push(
+        `drawbox=x=${x}:y=${y}:w=${w}:h=${h}:color=${color}@0.92:t=4:enable='${enable}'`
+      );
+      if (includeLabels) {
+        filters.push(
+          `drawtext=text='${escapeDrawtext(labelTextForVideo(box.label))}':x=${x}:y=max(0\\,${y}-24):fontsize=18:fontcolor=${color}:box=1:boxcolor=black@0.68:boxborderw=4:enable='${enable}'`
+        );
+      }
+    }
+  }
+
+  return `[0:v]${filters.join(",")}[v]`;
+}
+
+function normalizedExpr(axis: "iw" | "ih", value: number) {
+  return `${axis}*${Math.max(0, Math.min(1, value)).toFixed(6)}`;
+}
+
+function ffmpegColor(color: string) {
+  return `0x${color.replace(/^#/, "").slice(0, 6) || "75f0c8"}`;
+}
+
+function labelTextForVideo(label: DetectionLabel) {
+  return label === "explosion_flash" ? "flash heat" : label.replaceAll("_", " ");
+}
+
+function escapeDrawtext(text: string) {
+  return text.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
 
 function summarizeDamage(frames: VideoFrameAssessment[], events: VideoEvent[]): DamageAssessment {

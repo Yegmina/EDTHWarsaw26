@@ -25,7 +25,6 @@ const suppliedVideoUrl = "/demo/video_2026-06-20_20-14-28.mp4";
 
 const defaultSettings: AssessmentSettings = {
   fps: 1,
-  maxFrames: 24,
   eventSensitivity: 0.35,
   openAiFrameLimit: 8,
   processingConcurrency: 4,
@@ -120,6 +119,7 @@ export function VideoAssessmentPanel() {
     () => playbackFrameFromTime(result, currentVideoTime),
     [currentVideoTime, result]
   );
+  const showLivePlaybackOverlay = Boolean(result && !result.video.annotatedUrl && playbackFrame);
 
   const strongestEvent = useMemo(() => {
     if (!result?.events.length) {
@@ -204,7 +204,7 @@ export function VideoAssessmentPanel() {
       setResult(assessment);
       setSelectedFrameId(assessment.events[0]?.frameId ?? assessment.frames[0]?.id ?? "");
       setCurrentVideoTime(0);
-      setVideoUrl(assessment.video.url);
+      setVideoUrl(assessment.video.annotatedUrl ?? assessment.video.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Video assessment failed.");
     } finally {
@@ -259,7 +259,7 @@ export function VideoAssessmentPanel() {
                 onSeeked={(event) => setCurrentVideoTime(event.currentTarget.currentTime)}
                 onTimeUpdate={(event) => setCurrentVideoTime(event.currentTarget.currentTime)}
               />
-              {playbackFrame ? (
+              {showLivePlaybackOverlay && playbackFrame ? (
                 <div className="video-playback-box-layer" style={videoBoxLayerStyle(playbackFrame)} aria-hidden="true">
                   {playbackFrame.boxes.map((box) => (
                     <div className="video-box playback-box" key={`playback-${box.id}`} style={boxStyle(box)}>
@@ -284,17 +284,6 @@ export function VideoAssessmentPanel() {
                 type="number"
                 value={settings.fps}
                 onChange={(event) => updateSetting("fps", Number(event.target.value))}
-              />
-            </label>
-            <label>
-              Max frames
-              <input
-                max={80}
-                min={4}
-                step={1}
-                type="number"
-                value={settings.maxFrames}
-                onChange={(event) => updateSetting("maxFrames", Number(event.target.value))}
               />
             </label>
             <label>
@@ -429,6 +418,10 @@ export function VideoAssessmentPanel() {
             <article>
               <span>Frames</span>
               <strong>{result ? `${result.processing.frameCount} sampled` : "pending"}</strong>
+            </article>
+            <article>
+              <span>Video output</span>
+              <strong>{result ? (result.processing.annotatedVideo ? "annotated MP4" : "source MP4") : "pending"}</strong>
             </article>
             <article>
               <span>Strongest event</span>
