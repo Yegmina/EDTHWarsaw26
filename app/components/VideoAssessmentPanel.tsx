@@ -323,7 +323,6 @@ export function VideoAssessmentPanel() {
             <label>
               Concurrency
               <input
-                max={8}
                 min={1}
                 step={1}
                 type="number"

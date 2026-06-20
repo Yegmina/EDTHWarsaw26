@@ -92,9 +92,7 @@ export function normalizeAssessmentSettings(input: unknown): AssessmentSettings 
     openAiFrameLimit: Math.round(
       clampNumber(value.openAiFrameLimit, 0, 16, defaultAssessmentSettings.openAiFrameLimit)
     ),
-    processingConcurrency: Math.round(
-      clampNumber(value.processingConcurrency, 1, 8, defaultAssessmentSettings.processingConcurrency)
-    ),
+    processingConcurrency: positiveInteger(value.processingConcurrency, defaultAssessmentSettings.processingConcurrency),
     videoMode: validVideoMode(value.videoMode) ?? defaultAssessmentSettings.videoMode
   };
 }
@@ -984,6 +982,14 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
     return fallback;
   }
   return Math.min(max, Math.max(min, parsed));
+}
+
+function positiveInteger(value: unknown, fallback: number) {
+  const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(1, Math.round(parsed));
 }
 
 async function mapWithConcurrency<T, R>(

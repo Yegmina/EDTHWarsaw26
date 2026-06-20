@@ -99,7 +99,7 @@ Loads public camera markers from the configured provider and returns normalized 
 
 Accepts multipart video uploads or `supplied=true`. Extracts sampled frames, runs local visual-change analysis, optionally runs GPT-5.5 frame review, and returns severity, smoke/fire/dust evidence, boxes, events, and frame URLs.
 
-Settings include `fps`, `maxFrames`, `eventSensitivity`, `openAiFrameLimit`, `processingConcurrency`, and `videoMode`. `processingConcurrency` controls parallel server-side frame decoding; `videoMode` is passed into the vision-review prompt so thermal, visual, and mixed footage are interpreted differently.
+Settings include `fps`, `maxFrames`, `eventSensitivity`, `openAiFrameLimit`, `processingConcurrency`, and `videoMode`. `processingConcurrency` controls parallel server-side frame decoding and has no fixed upper cap in the API; `videoMode` is passed into the vision-review prompt so thermal, visual, and mixed footage are interpreted differently.
 
 `GET /api/video-assessments/:id`
 
