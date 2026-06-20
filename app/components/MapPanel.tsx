@@ -10,7 +10,6 @@ import {
   Maximize2,
   Menu,
   Minimize2,
-  Radiation,
   Radio,
   Ruler,
   Search,
@@ -68,7 +67,6 @@ type ToolKey =
   | "cameras"
   | "audio"
   | "weather"
-  | "radiation"
   | "fires";
 
 type WeaponTemplate = {
@@ -186,7 +184,6 @@ const tools: Array<{
   { key: "cameras", label: "Cameras", Icon: Video },
   { key: "audio", label: "Audio sensors", Icon: Radio },
   { key: "weather", label: "Weather", Icon: Cloud },
-  { key: "radiation", label: "Radiation", Icon: Radiation },
   { key: "fires", label: "Fires", Icon: Flame }
 ];
 
@@ -1396,9 +1393,6 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
           </div>
         ) : null}
         {activeTool === "weather" ? <p>Weather layer placeholder active. Connect provider data when available.</p> : null}
-        {activeTool === "radiation" ? (
-          <p>Radiation layer placeholder active. No live radiation feed is configured.</p>
-        ) : null}
         {activeTool === "fires" ? <p>Incident/fires layer placeholder active. No live incident feed is configured.</p> : null}
       </div>
       {selectedCamera && showPublicCameras ? (
