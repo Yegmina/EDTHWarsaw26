@@ -14,6 +14,7 @@ import type {
   FrameMetrics,
   OpenAiVideoReview,
   PeopleRiskAssessment,
+  VideoMode,
   VideoAssessmentResult,
   VideoEvent,
   VideoFrameAssessment
@@ -72,7 +73,9 @@ export const defaultAssessmentSettings: AssessmentSettings = {
   fps: 1,
   maxFrames: 24,
   eventSensitivity: 0.35,
-  openAiFrameLimit: 8
+  openAiFrameLimit: 8,
+  processingConcurrency: 4,
+  videoMode: "auto"
 };
 
 export function normalizeAssessmentSettings(input: unknown): AssessmentSettings {
@@ -88,7 +91,11 @@ export function normalizeAssessmentSettings(input: unknown): AssessmentSettings 
     ),
     openAiFrameLimit: Math.round(
       clampNumber(value.openAiFrameLimit, 0, 16, defaultAssessmentSettings.openAiFrameLimit)
-    )
+    ),
+    processingConcurrency: Math.round(
+      clampNumber(value.processingConcurrency, 1, 8, defaultAssessmentSettings.processingConcurrency)
+    ),
+    videoMode: validVideoMode(value.videoMode) ?? defaultAssessmentSettings.videoMode
   };
 }
 
@@ -141,7 +148,7 @@ async function analyzeSavedVideo(
 
   const metadata = await probeVideo(sourcePath);
   const extractedFrames = await extractFrames(sourcePath, framesDir, settings);
-  const rawFrames = await loadRawFrames(extractedFrames, settings.fps);
+  const rawFrames = await loadRawFrames(extractedFrames, settings.processingConcurrency);
   const frameAssessments = analyzeFrames(id, rawFrames, settings);
   const localEvents = buildEvents(frameAssessments);
   const localDamage = summarizeDamage(frameAssessments, localEvents);
@@ -227,20 +234,18 @@ async function extractFrames(sourcePath: string, framesDir: string, settings: As
 
 async function loadRawFrames(
   frames: Array<{ id: string; fileName: string; absolutePath: string; timeSec: number }>,
-  _fps: number
+  concurrency: number
 ): Promise<RawFrame[]> {
-  const result: RawFrame[] = [];
-  for (const frame of frames) {
+  return mapWithConcurrency(frames, concurrency, async (frame) => {
     const image = sharp(frame.absolutePath).toColorspace("srgb");
     const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-    result.push({
+    return {
       ...frame,
       width: info.width,
       height: info.height,
       data
-    });
-  }
-  return result;
+    };
+  });
 }
 
 function analyzeFrames(id: string, frames: RawFrame[], settings: AssessmentSettings): VideoFrameAssessment[] {
@@ -486,9 +491,16 @@ async function reviewFramesWithOpenAi(
   }
 
   const selected = selectFramesForOpenAi(rawFrames, frames, events, settings.openAiFrameLimit);
+  const videoModeInstruction = videoModePrompt(settings.videoMode);
   const prompt = [
     "You are a video evidence assessment analyst.",
     "Analyze only visible evidence in these extracted video frames.",
+    `Video mode setting: ${settings.videoMode}.`,
+    videoModeInstruction,
+    "A frame may be normal RGB/visual footage, thermal/infrared footage, or a mixed composite with thermal inset plus RGB view.",
+    "For thermal or mixed footage, interpret color palettes as relative heat contrast; do not treat thermal hot colors as visible flame unless RGB/visual evidence supports it.",
+    "For smoke color, use visible RGB evidence only. If only thermal evidence is available, mark smoke color as unknown and explain the limitation.",
+    "When thermal and RGB disagree, report both observations and keep severity tied to visible evidence, not hidden inference.",
     "Return damage assessment evidence: bounding boxes, smoke/fire/dust/explosion indicators, smoke color, people-risk indicators, severity, confidence, and verification gaps.",
     "Do not provide targeting, strike correction, weapon-use, evasion, routing, or future attack recommendations.",
     "Do not infer hidden objects, precise geolocation, unit identity, casualties, or intent.",
@@ -626,7 +638,9 @@ function mergeAssessment(input: {
     processing: {
       localCvVersion: "color-change-v1",
       frameCount: input.frames.length,
-      ffmpeg: true
+      ffmpeg: true,
+      processingConcurrency: input.settings.processingConcurrency,
+      videoMode: input.settings.videoMode
     }
   };
 }
@@ -891,6 +905,23 @@ function validConfidence(confidence: unknown): ConfidenceLevel | undefined {
   return confidence === "low" || confidence === "medium" || confidence === "high" ? confidence : undefined;
 }
 
+function validVideoMode(value: unknown): VideoMode | undefined {
+  return value === "auto" || value === "visual" || value === "thermal" || value === "mixed" ? value : undefined;
+}
+
+function videoModePrompt(mode: VideoMode) {
+  return {
+    auto:
+      "Auto mode: decide from visible frame content whether each image is RGB/visual, thermal/infrared, or mixed, and state that basis in observations.",
+    visual:
+      "Visual mode: treat frames as normal RGB camera footage unless a visible thermal inset or palette is clearly present.",
+    thermal:
+      "Thermal mode: treat frames as thermal/infrared evidence. Focus on relative hot/cold patterns, plume contrast, and motion/change; avoid claiming visible color or open flame from palette colors alone.",
+    mixed:
+      "Mixed mode: treat frames as containing both thermal/infrared and RGB/visual evidence. Separate thermal hot-spot observations from visible smoke, dust, fire, people, and object observations."
+  }[mode];
+}
+
 function colorForLabel(label: DetectionLabel) {
   return {
     explosion_flash: "#ffcc48",
@@ -953,6 +984,26 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
     return fallback;
   }
   return Math.min(max, Math.max(min, parsed));
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.max(1, Math.min(Math.round(concurrency), items.length || 1));
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(items[index], index);
+      }
+    })
+  );
+  return results;
 }
 
 function assertSafeId(id: string) {

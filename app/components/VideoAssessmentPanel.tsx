@@ -27,7 +27,9 @@ const defaultSettings: AssessmentSettings = {
   fps: 1,
   maxFrames: 24,
   eventSensitivity: 0.35,
-  openAiFrameLimit: 8
+  openAiFrameLimit: 8,
+  processingConcurrency: 4,
+  videoMode: "auto"
 };
 
 const severityRank: Record<DamageSeverity, number> = {
@@ -66,6 +68,16 @@ function selectedFrameFromResult(result: VideoAssessmentResult | null, selectedF
   return result.frames.find((frame) => frame.id === selectedFrameId) ?? result.frames[0] ?? null;
 }
 
+function playbackFrameFromTime(result: VideoAssessmentResult | null, timeSec: number) {
+  if (!result?.frames.length) {
+    return null;
+  }
+
+  return result.frames.reduce((best, frame) =>
+    Math.abs(frame.timeSec - timeSec) < Math.abs(best.timeSec - timeSec) ? frame : best
+  );
+}
+
 function boxStyle(box: DetectionBox) {
   return {
     borderColor: box.color,
@@ -77,6 +89,16 @@ function boxStyle(box: DetectionBox) {
   };
 }
 
+function videoBoxLayerStyle(frame: VideoFrameAssessment) {
+  const aspectRatio = `${frame.width} / ${frame.height}`;
+  const frameAspect = frame.width / Math.max(1, frame.height);
+  const playerAspect = 16 / 10;
+
+  return frameAspect >= playerAspect
+    ? { aspectRatio, width: "100%" }
+    : { aspectRatio, height: "100%" };
+}
+
 export function VideoAssessmentPanel() {
   const [settings, setSettings] = useState<AssessmentSettings>(defaultSettings);
   const [result, setResult] = useState<VideoAssessmentResult | null>(null);
@@ -86,11 +108,17 @@ export function VideoAssessmentPanel() {
   const [usingSuppliedVideo, setUsingSuppliedVideo] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const selectedFrame = useMemo(
     () => selectedFrameFromResult(result, selectedFrameId),
     [result, selectedFrameId]
+  );
+
+  const playbackFrame = useMemo(
+    () => playbackFrameFromTime(result, currentVideoTime),
+    [currentVideoTime, result]
   );
 
   const strongestEvent = useMemo(() => {
@@ -122,6 +150,7 @@ export function VideoAssessmentPanel() {
     setUsingSuppliedVideo(false);
     setResult(null);
     setSelectedFrameId("");
+    setCurrentVideoTime(0);
     setError("");
 
     if (videoUrl.startsWith("blob:")) {
@@ -141,6 +170,7 @@ export function VideoAssessmentPanel() {
     setVideoUrl(suppliedVideoUrl);
     setResult(null);
     setSelectedFrameId("");
+    setCurrentVideoTime(0);
     setError("");
   }
 
@@ -173,6 +203,7 @@ export function VideoAssessmentPanel() {
       const assessment = body as VideoAssessmentResult;
       setResult(assessment);
       setSelectedFrameId(assessment.events[0]?.frameId ?? assessment.frames[0]?.id ?? "");
+      setCurrentVideoTime(0);
       setVideoUrl(assessment.video.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Video assessment failed.");
@@ -218,7 +249,29 @@ export function VideoAssessmentPanel() {
           </div>
 
           <div className="video-player-frame">
-            <video ref={videoRef} controls playsInline src={videoUrl} />
+            <div className="video-player-stage">
+              <video
+                ref={videoRef}
+                controls
+                playsInline
+                src={videoUrl}
+                onLoadedMetadata={(event) => setCurrentVideoTime(event.currentTarget.currentTime)}
+                onSeeked={(event) => setCurrentVideoTime(event.currentTarget.currentTime)}
+                onTimeUpdate={(event) => setCurrentVideoTime(event.currentTarget.currentTime)}
+              />
+              {playbackFrame ? (
+                <div className="video-playback-box-layer" style={videoBoxLayerStyle(playbackFrame)} aria-hidden="true">
+                  {playbackFrame.boxes.map((box) => (
+                    <div className="video-box playback-box" key={`playback-${box.id}`} style={boxStyle(box)}>
+                      <span>{labelText(box.label)}</span>
+                    </div>
+                  ))}
+                  <div className="frame-timecode playback-timecode">
+                    {formatSeconds(playbackFrame.timeSec)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="video-settings-grid">
@@ -266,6 +319,31 @@ export function VideoAssessmentPanel() {
                 value={settings.openAiFrameLimit}
                 onChange={(event) => updateSetting("openAiFrameLimit", Number(event.target.value))}
               />
+            </label>
+            <label>
+              Concurrency
+              <input
+                max={8}
+                min={1}
+                step={1}
+                type="number"
+                value={settings.processingConcurrency}
+                onChange={(event) => updateSetting("processingConcurrency", Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Video mode
+              <select
+                value={settings.videoMode}
+                onChange={(event) =>
+                  updateSetting("videoMode", event.target.value as AssessmentSettings["videoMode"])
+                }
+              >
+                <option value="auto">Auto detect</option>
+                <option value="visual">Visual / RGB</option>
+                <option value="thermal">Thermal / IR</option>
+                <option value="mixed">Mixed RGB + thermal</option>
+              </select>
             </label>
           </div>
 
@@ -357,6 +435,16 @@ export function VideoAssessmentPanel() {
               <span>Strongest event</span>
               <strong className={strongestEvent ? severityClass(strongestEvent.severity) : ""}>
                 {strongestEvent?.severity ?? "pending"}
+              </strong>
+            </article>
+            <article>
+              <span>Mode</span>
+              <strong>{result?.processing.videoMode ?? settings.videoMode}</strong>
+            </article>
+            <article>
+              <span>Concurrency</span>
+              <strong>
+                {result?.processing.processingConcurrency ?? settings.processingConcurrency}
               </strong>
             </article>
           </div>

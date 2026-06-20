@@ -12,11 +12,15 @@ export type DetectionLabel =
 
 export type ConfidenceLevel = "low" | "medium" | "high";
 
+export type VideoMode = "auto" | "visual" | "thermal" | "mixed";
+
 export type AssessmentSettings = {
   fps: number;
   maxFrames: number;
   eventSensitivity: number;
   openAiFrameLimit: number;
+  processingConcurrency: number;
+  videoMode: VideoMode;
 };
 
 export type DetectionBox = {
@@ -111,5 +115,7 @@ export type VideoAssessmentResult = {
     localCvVersion: string;
     frameCount: number;
     ffmpeg: boolean;
+    processingConcurrency: number;
+    videoMode: VideoMode;
   };
 };

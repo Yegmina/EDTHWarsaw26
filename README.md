@@ -15,8 +15,9 @@ The application turns unstructured source notes into a structured analyst brief,
 - Public camera layer loaded through `/api/cameras`, including estimated camera sectors and stream preview links.
 - Distributed audio sensor layer with coverage visualization.
 - Fullscreen map mode and layer/tool controls.
-- Stage 2 video damage assessment with local frame extraction, visual change boxes, smoke/fire/dust indicators, frame timeline, and GPT-5.5 vision review.
+- Stage 2 video damage assessment with local frame extraction, visual change boxes, smoke/fire/dust indicators, synchronized video-player boxes, frame timeline, and GPT-5.5 vision review.
 - Supplied MP4 workflow plus uploaded video processing through server-side API routes.
+- Stage 2 controls for frame-processing concurrency and video mode: auto, visual/RGB, thermal/IR, or mixed RGB + thermal.
 
 ## Tech Stack
 
@@ -97,6 +98,8 @@ Loads public camera markers from the configured provider and returns normalized 
 `POST /api/video-assessments`
 
 Accepts multipart video uploads or `supplied=true`. Extracts sampled frames, runs local visual-change analysis, optionally runs GPT-5.5 frame review, and returns severity, smoke/fire/dust evidence, boxes, events, and frame URLs.
+
+Settings include `fps`, `maxFrames`, `eventSensitivity`, `openAiFrameLimit`, `processingConcurrency`, and `videoMode`. `processingConcurrency` controls parallel server-side frame decoding; `videoMode` is passed into the vision-review prompt so thermal, visual, and mixed footage are interpreted differently.
 
 `GET /api/video-assessments/:id`
 
