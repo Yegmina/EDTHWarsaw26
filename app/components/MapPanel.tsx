@@ -76,7 +76,7 @@ type WeaponTemplate = {
 type TacticalLocationTemplate = {
   id: string;
   name: string;
-  type: "Unit" | "Airfield" | "Headquarters" | "Logistics";
+  type: "Unit" | "Airfield" | "Headquarters" | "Logistics" | "Air Defense" | "Missile";
   status: string;
   sourceName: string;
   sourceUrl: string;
@@ -205,6 +205,159 @@ const tacticalLocationTemplates: TacticalLocationTemplate[] = [
   }
 ];
 
+const preloadedTacticalLocations: TacticalLocation[] = [
+  {
+    id: "ref-unit-01",
+    name: "Motorized rifle formation reference",
+    type: "Unit",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.28,
+    lng: 38.1
+  },
+  {
+    id: "ref-unit-02",
+    name: "Combined-arms unit reference",
+    type: "Unit",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 55.42,
+    lng: 36.82
+  },
+  {
+    id: "ref-unit-03",
+    name: "Reserve formation reference",
+    type: "Unit",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 54.96,
+    lng: 38.84
+  },
+  {
+    id: "ref-hq-01",
+    name: "District headquarters reference",
+    type: "Headquarters",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.06,
+    lng: 37.18
+  },
+  {
+    id: "ref-hq-02",
+    name: "Operational command reference",
+    type: "Headquarters",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 55.12,
+    lng: 37.52
+  },
+  {
+    id: "ref-airfield-01",
+    name: "Airfield reference Alpha",
+    type: "Airfield",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.44,
+    lng: 39.28
+  },
+  {
+    id: "ref-airfield-02",
+    name: "Airfield reference Bravo",
+    type: "Airfield",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 55.82,
+    lng: 35.98
+  },
+  {
+    id: "ref-airfield-03",
+    name: "Airfield reference Charlie",
+    type: "Airfield",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 54.62,
+    lng: 37.18
+  },
+  {
+    id: "ref-log-01",
+    name: "Rail logistics node reference",
+    type: "Logistics",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.72,
+    lng: 36.84
+  },
+  {
+    id: "ref-log-02",
+    name: "Depot logistics node reference",
+    type: "Logistics",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 55.68,
+    lng: 39.82
+  },
+  {
+    id: "ref-log-03",
+    name: "Road logistics node reference",
+    type: "Logistics",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 54.42,
+    lng: 36.32
+  },
+  {
+    id: "ref-ad-01",
+    name: "Air-defense reference sector",
+    type: "Air Defense",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.1,
+    lng: 40.14
+  },
+  {
+    id: "ref-ad-02",
+    name: "Short-range air-defense reference",
+    type: "Air Defense",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 55.22,
+    lng: 39.1
+  },
+  {
+    id: "ref-missile-01",
+    name: "Missile support reference",
+    type: "Missile",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 56.52,
+    lng: 37.62
+  },
+  {
+    id: "ref-missile-02",
+    name: "Missile storage reference",
+    type: "Missile",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 54.82,
+    lng: 40.24
+  }
+];
+
 function MapController({ layers, isFullscreen }: { layers: MapLayer[]; isFullscreen: boolean }) {
   const map = useMap();
 
@@ -256,6 +409,14 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
   const [locationPlacementArmed, setLocationPlacementArmed] = useState(false);
   const [lastMapClick, setLastMapClick] = useState({ lat: 55.7558, lng: 37.6173 });
   const [tacticalLocations, setTacticalLocations] = useState<TacticalLocation[]>([]);
+  const [locationFilters, setLocationFilters] = useState({
+    Unit: true,
+    Airfield: true,
+    Headquarters: true,
+    Logistics: true,
+    "Air Defense": true,
+    Missile: true
+  });
 
   const activeToolTitle = useMemo(() => tools.find((tool) => tool.key === activeTool)?.label ?? "Layers", [
     activeTool
@@ -267,6 +428,12 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
   const allRangeRings = [...rangeRings, ...weaponRings];
   const selectedLocation =
     tacticalLocationTemplates.find((location) => location.id === selectedLocationId) ?? tacticalLocationTemplates[0];
+  const allTacticalLocations = [...preloadedTacticalLocations, ...tacticalLocations];
+  const visibleTacticalLocations = allTacticalLocations.filter((location) => locationFilters[location.type]);
+
+  function toggleLocationFilter(type: TacticalLocation["type"]) {
+    setLocationFilters((filters) => ({ ...filters, [type]: !filters[type] }));
+  }
 
   function toggleTool(tool: ToolKey) {
     setActiveTool((current) => (current === tool ? "layers" : tool));
@@ -389,7 +556,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
           </div>
         )) : null}
         {showMarkers
-          ? tacticalLocations.map((location) => (
+          ? visibleTacticalLocations.map((location) => (
               <CircleMarker
                 center={[location.lat, location.lng]}
                 radius={location.type === "Airfield" ? 8 : 6}
@@ -457,6 +624,19 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
             </div>
             <div className="tactical-location-panel">
               <h3>Tactical locations</h3>
+              <div className="location-filter-grid">
+                {(["Unit", "Headquarters", "Airfield", "Logistics", "Air Defense", "Missile"] as Array<
+                  TacticalLocation["type"]
+                >).map((type) => (
+                  <label key={type}>
+                    <input checked={locationFilters[type]} onChange={() => toggleLocationFilter(type)} type="checkbox" />
+                    {type}
+                  </label>
+                ))}
+              </div>
+              <div className="location-count">
+                Showing {visibleTacticalLocations.length} of {allTacticalLocations.length}
+              </div>
               <label>
                 Location template
                 <select value={selectedLocation.id} onChange={(event) => setSelectedLocationId(event.target.value)}>
@@ -498,7 +678,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
         {activeTool === "info" ? (
           <p>
             Active layer: {visibleLayers[0]?.label}. Confidence: {visibleLayers[0]?.confidence}. Rings:{" "}
-            {allRangeRings.length}. Locations: {tacticalLocations.length}.
+            {allRangeRings.length}. Locations: {visibleTacticalLocations.length}/{allTacticalLocations.length}.
           </p>
         ) : null}
         {activeTool === "measure" ? (

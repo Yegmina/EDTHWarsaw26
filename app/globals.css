@@ -550,6 +550,37 @@ button:disabled {
   font-size: 0.86rem;
 }
 
+.location-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.location-filter-grid label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  color: #17211c;
+  font-size: 0.72rem;
+}
+
+.location-filter-grid input {
+  width: 14px;
+  height: 14px;
+  accent-color: #17211c;
+}
+
+.location-count {
+  border: 1px solid rgba(23, 33, 28, 0.12);
+  border-radius: 6px;
+  background: rgba(23, 33, 28, 0.06);
+  color: rgba(23, 33, 28, 0.72);
+  padding: 6px 8px;
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+}
+
 .tactical-location-panel label {
   display: grid;
   gap: 6px;
