@@ -66,22 +66,25 @@ type RangeRing = {
 };
 
 const sampleInput = `Source: private analyst note
-Public reporting claims several air-defense systems are positioned around a central Moscow landmark. The note has no timestamp, imagery, or corroborating metadata.`;
+Claim: 5 Pantsir air-defense systems are positioned around the Red Square perimeter in Moscow.
+Time observed: not stated.
+Evidence attached: none.
+Provenance: secondhand note, no imagery, no metadata, no independent confirmation.`;
 
 const emptyResult: AnalysisResult = {
   brief:
-    "Paste current-state notes, reports, or source excerpts to generate a non-operational analyst brief before planning begins.",
+    "Paste a current-state note to extract claim-level details: who or what is mentioned, quantity, named place, time phrase, evidence provided, and verification gaps.",
   observations: [
     {
-      label: "Awaiting input",
-      detail: "The zero stage turns unstructured context into a reviewable summary with uncertainty and evidence gaps.",
+      label: "Awaiting source claim",
+      detail: "Stage 0 preserves source-stated details as unverified claims, then separates evidence gaps from confidence.",
       confidence: "medium",
       source: "system"
     }
   ],
   confidence: "medium",
-  sourceGaps: ["No user source has been analyzed yet."],
-  verificationQuestions: ["What evidence is current, geolocated, and independently corroborated?"],
+  sourceGaps: ["No source text, timestamp, imagery, provenance chain, or corroborating report has been submitted."],
+  verificationQuestions: ["What exactly is claimed, when was it observed, what evidence supports it, and who can corroborate it?"],
   safetyFlags: [],
   mapLayers: [],
   evidenceCards: []
@@ -212,12 +215,19 @@ export default function Home() {
             <textarea
               value={rawText}
               onChange={(event) => setRawText(event.target.value)}
-              placeholder="Paste raw notes, reports, excerpts, observations, timestamps, or uncertainty here..."
+              placeholder="Paste exact claim text, quantities, equipment names, place names, time phrases, source notes, and evidence gaps..."
             />
           </label>
 
           <div className="input-footer">
-            <button type="button" className="ghost-button" onClick={() => setRawText(sampleInput)}>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                setSourceTitle("Private analyst note");
+                setRawText(sampleInput);
+              }}
+            >
               Load sample
             </button>
             <div className="telemetry">
@@ -319,7 +329,7 @@ export default function Home() {
             </div>
           ) : null}
           <div className="confidence-row">
-            <span>Overall confidence</span>
+            <span>Source confidence</span>
             <strong className={`confidence confidence-${analysis.confidence}`}>{analysis.confidence}</strong>
           </div>
           {analysis.safetyFlags.length ? (

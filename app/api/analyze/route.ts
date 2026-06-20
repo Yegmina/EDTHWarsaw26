@@ -50,15 +50,19 @@ const gazetteer = [
 
 function sourceConfidence(payload: AnalyzeRequest) {
   const title = payload.sourceTitle?.toLowerCase() ?? "";
+  const rawText = payload.rawText ?? "";
   const hasPrivateDocument = title.includes("private") || title.includes("document");
   const hasSourceUrl = Boolean(payload.sourceUrl?.trim());
   const hasImageUrl = Boolean(payload.imageUrl?.trim());
+  const hasStructuredSourceText =
+    /(^|\n)\s*(source|provenance|report|document|packet)\s*:/i.test(rawText) ||
+    /\b(private analyst note|field report|osint packet|source note)\b/i.test(rawText);
 
   if (hasSourceUrl && hasImageUrl) {
     return "high";
   }
 
-  if (hasPrivateDocument || hasSourceUrl || hasImageUrl) {
+  if (hasPrivateDocument || hasStructuredSourceText || hasSourceUrl || hasImageUrl) {
     return "medium";
   }
 
@@ -79,6 +83,40 @@ function normalizeBriefConfidence(brief: unknown, confidence: "low" | "medium" |
   return brief
     .replace(/\blow-confidence\b/gi, `${confidence}-confidence`)
     .replace(/\blow confidence\b/gi, `${confidence} confidence`);
+}
+
+function compactClaimText(rawText: string) {
+  const normalized = rawText.replace(/\s+/g, " ").trim();
+  return normalized.length > 360 ? `${normalized.slice(0, 357)}...` : normalized;
+}
+
+function sourceStatedObservation(rawText: string, confidence: "low" | "medium" | "high") {
+  return {
+    label: "Source-stated claim",
+    detail: `Submitted text states: "${compactClaimText(rawText)}"`,
+    confidence,
+    source: "provided text"
+  };
+}
+
+function concreteBriefPrefix(rawText: string) {
+  return `Source-stated claim: ${compactClaimText(rawText)}`;
+}
+
+function prependConcreteBrief(rawText: string, brief: string) {
+  const prefix = concreteBriefPrefix(rawText);
+  const separator = /[.!?]$/.test(prefix) ? " " : ". ";
+  return `${prefix}${separator}${brief}`;
+}
+
+function hasSourceClaimObservation(observations: unknown[]) {
+  return observations.some(
+    (observation) =>
+      typeof observation === "object" &&
+      observation !== null &&
+      "label" in observation &&
+      String((observation as Record<string, unknown>).label).toLowerCase() === "source-stated claim"
+  );
 }
 
 function inferMapLayers(rawText: string, confidence: "low" | "medium" | "high") {
@@ -231,18 +269,21 @@ export async function POST(request: Request) {
   const confidenceBaseline = sourceConfidence(payload);
   const prompt = [
     "You are an evidence-intake analyst for a military planning support interface.",
-    "Summarize user-provided current-state information into a concise analyst brief.",
+    "Summarize user-provided current-state information into a concrete analyst brief.",
     "Do not recommend attacks, target selection, strike corrections, weapon use, evasion tactics, or routes.",
     "Do not enrich the input with real military locations, unit positions, weapon ranges, readiness, vulnerabilities, or inferred coordinates.",
-    "If the input includes military placement claims, air-defense assets, base locations, or exploitable details, keep the summary high-level and clearly mark verification requirements.",
+    "Preserve source-stated specifics as claims: quantities, equipment names, place names, time phrases, source type, and exact uncertainty.",
+    "If a claim might be false, still state what the source claims; label it unverified instead of rewriting it into vague language.",
+    "Do not invent details, coordinates, timestamps, or confirmation status that are not in the input.",
+    "Example: if the text says 'there is 5 Pantsir near Red Square', write 'The source claims 5 Pantsir air-defense systems near Red Square (unverified)', not 'an air-defense claim near a public landmark'.",
     `Use ${confidenceBaseline} as the minimum source/provenance confidence when the source title, URL, or image suggests a submitted document/source exists; keep verification gaps separate from confidence.`,
     "Return only valid JSON with this exact shape:",
     "{",
-    '  "brief": "2-4 sentence analyst summary",',
-    '  "observations": [{"label":"short label","detail":"non-operational detail","confidence":"low|medium|high","source":"provided text|provided url|unknown"}],',
+    '  "brief": "3-5 sentence analyst summary with concrete source-stated details and unverified/confirmed wording",',
+    '  "observations": [{"label":"short concrete label","detail":"specific claim detail, preserving source-stated numbers/names/places without adding new facts","confidence":"low|medium|high","source":"provided text|provided url|unknown"}],',
     `  "confidence": "${confidenceBaseline}|low|medium|high",`,
-    '  "sourceGaps": ["missing evidence or uncertainty"],',
-    '  "verificationQuestions": ["questions for human review"],',
+    '  "sourceGaps": ["specific missing evidence, timestamp, provenance, imagery, metadata, corroboration"],',
+    '  "verificationQuestions": ["concrete questions for human review"],',
     '  "safetyFlags": ["review flags, or empty array"]',
     "}",
     "",
@@ -296,8 +337,12 @@ export async function POST(request: Request) {
   const outputText = extractOutputText(openAiBody);
   const analysis = parseJsonObject(outputText) as Record<string, unknown>;
   analysis.confidence = higherConfidence(analysis.confidence, confidenceBaseline);
-  analysis.brief = normalizeBriefConfidence(analysis.brief, confidenceBaseline);
-  analysis.observations = Array.isArray(analysis.observations)
+  const normalizedBrief = normalizeBriefConfidence(analysis.brief, confidenceBaseline);
+  analysis.brief =
+    typeof normalizedBrief === "string" && normalizedBrief.trim()
+      ? prependConcreteBrief(rawText, normalizedBrief)
+      : concreteBriefPrefix(rawText);
+  const normalizedObservations = Array.isArray(analysis.observations)
     ? analysis.observations.map((observation) =>
         typeof observation === "object" && observation !== null
           ? {
@@ -310,6 +355,9 @@ export async function POST(request: Request) {
           : observation
       )
     : [];
+  analysis.observations = hasSourceClaimObservation(normalizedObservations)
+    ? normalizedObservations
+    : [sourceStatedObservation(rawText, confidenceBaseline), ...normalizedObservations];
   analysis.mapLayers = inferMapLayers(rawText, confidenceBaseline);
   analysis.evidenceCards = await inferEvidenceCards(payload, rawText);
 
