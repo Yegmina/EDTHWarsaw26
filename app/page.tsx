@@ -160,7 +160,7 @@ export default function Home() {
         <div className="status-strip">
           <span>
             <ShieldCheck size={16} />
-            GPT-5.5 server-side
+            LLM analysis engine
           </span>
           <span>
             <Globe2 size={16} />
