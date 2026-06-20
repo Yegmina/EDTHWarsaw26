@@ -95,18 +95,7 @@ const diamondIcon = L.divIcon({
   popupAnchor: [0, -8]
 });
 
-const defaultLayers: MapLayer[] = [
-  {
-    id: "russia-context",
-    label: "Russia context",
-    lat: 61.5,
-    lng: 92,
-    radiusMeters: 3600000,
-    confidence: "medium",
-    category: "context",
-    detail: "Country-scale reference layer."
-  }
-];
+const defaultLayers: MapLayer[] = [];
 
 const tools: Array<{
   key: ToolKey;
@@ -171,6 +160,14 @@ const weaponTemplates: WeaponTemplate[] = [
 ];
 
 const tacticalLocationTemplates: TacticalLocationTemplate[] = [
+  {
+    id: "air-defense-reference",
+    name: "Air-defense system reference",
+    type: "Air Defense",
+    status: "reference template",
+    sourceName: "Reference source",
+    sourceUrl: "https://deepstatemap.live/en"
+  },
   {
     id: "unit-reference",
     name: "Ground formation reference",
@@ -405,6 +402,66 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     sourceUrl: "https://deepstatemap.live/en",
     lat: 64.54,
     lng: 40.54
+  },
+  {
+    id: "ref-s300-01",
+    name: "S-300 reference system",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-300_missile_system",
+    lat: 56.87,
+    lng: 35.91
+  },
+  {
+    id: "ref-s400-01",
+    name: "S-400 reference system",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-400_missile_system",
+    lat: 61.25,
+    lng: 73.42
+  },
+  {
+    id: "ref-pantsir-01",
+    name: "Pantsir-S1 reference system",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/Pantsir_missile_system",
+    lat: 45.04,
+    lng: 39.01
+  },
+  {
+    id: "ref-buk-01",
+    name: "Buk reference system",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/Buk_missile_system",
+    lat: 54.99,
+    lng: 82.9
+  },
+  {
+    id: "ref-tor-01",
+    name: "Tor reference system",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/Tor_missile_system",
+    lat: 48.48,
+    lng: 135.08
+  },
+  {
+    id: "ref-radar-01",
+    name: "Radar coverage reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/Air_defense",
+    lat: 67.61,
+    lng: 33.67
   }
 ];
 
@@ -457,7 +514,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
   const [weaponPlacementArmed, setWeaponPlacementArmed] = useState(false);
   const [weaponRings, setWeaponRings] = useState<RangeRing[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState("42-mrd");
+  const [selectedLocationId, setSelectedLocationId] = useState("air-defense-reference");
   const [locationPlacementArmed, setLocationPlacementArmed] = useState(false);
   const [lastMapClick, setLastMapClick] = useState({ lat: 55.7558, lng: 37.6173 });
   const [tacticalLocations, setTacticalLocations] = useState<TacticalLocation[]>([]);
@@ -729,8 +786,10 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
         ) : null}
         {activeTool === "info" ? (
           <p>
-            Active layer: {visibleLayers[0]?.label}. Confidence: {visibleLayers[0]?.confidence}. Rings:{" "}
-            {allRangeRings.length}. Locations: {visibleTacticalLocations.length}/{allTacticalLocations.length}.
+            {visibleLayers[0]
+              ? `Active layer: ${visibleLayers[0].label}. Confidence: ${visibleLayers[0].confidence}. `
+              : "Reference systems visible. "}
+            Rings: {allRangeRings.length}. Locations: {visibleTacticalLocations.length}/{allTacticalLocations.length}.
           </p>
         ) : null}
         {activeTool === "measure" ? (
@@ -797,7 +856,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
       </div>
       <div className="map-overlay top-left">
         <span>LIVE SATELLITE BASEMAP</span>
-        <strong>{visibleLayers[0]?.label ?? "Russia Context Layer"}</strong>
+        <strong>{visibleLayers[0]?.label ?? "Air-defense reference layer"}</strong>
       </div>
       <div className="map-overlay bottom-right">
         <span>RANGE TOOL</span>

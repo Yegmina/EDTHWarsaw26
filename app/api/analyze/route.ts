@@ -100,18 +100,7 @@ function inferMapLayers(rawText: string, confidence: "low" | "medium" | "high") 
     return layers;
   }
 
-  return [
-    {
-      id: "russia-context",
-      label: "Russia context",
-      lat: 55.5,
-      lng: 61,
-      radiusMeters: 350000,
-      confidence,
-      category: "context",
-      detail: "Default context layer used when the text has no supported place reference."
-    }
-  ];
+  return [];
 }
 
 async function wikiCard(title: string): Promise<EvidenceCard> {
