@@ -12,6 +12,8 @@ build/
 next-dev.log
 next-dev.err.log
 
+data/video-assessments/
+
 .playwright-cli/
 output/
 

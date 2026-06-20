@@ -12,8 +12,10 @@ import {
   Radar,
   Ruler,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Video as VideoIcon
 } from "lucide-react";
+import { VideoAssessmentPanel } from "./components/VideoAssessmentPanel";
 
 const MapPanel = dynamic(() => import("./components/MapPanel").then((mod) => mod.MapPanel), {
   ssr: false,
@@ -169,6 +171,10 @@ export default function Home() {
           <span>
             <Radar size={16} />
             Range tools
+          </span>
+          <span>
+            <VideoIcon size={16} />
+            Video assessment
           </span>
         </div>
       </section>
@@ -391,6 +397,8 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        <VideoAssessmentPanel />
       </section>
     </main>
   );
