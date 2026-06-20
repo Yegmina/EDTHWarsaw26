@@ -14,13 +14,15 @@ import {
   Ruler,
   Search,
   SlidersHorizontal,
-  Target
+  Target,
+  Video
 } from "lucide-react";
 import {
   Circle,
   CircleMarker,
   Marker,
   MapContainer,
+  Polygon,
   Popup,
   TileLayer,
   useMap,
@@ -56,7 +58,7 @@ type MapPanelProps = {
   onRangeAnchorChange: (anchor: { lat: number; lng: number }) => void;
 };
 
-type ToolKey = "menu" | "alerts" | "info" | "layers" | "measure" | "weather" | "radiation" | "fires";
+type ToolKey = "menu" | "alerts" | "info" | "layers" | "measure" | "cameras" | "weather" | "radiation" | "fires";
 
 type WeaponTemplate = {
   id: string;
@@ -87,12 +89,48 @@ type TacticalLocation = TacticalLocationTemplate & {
   lng: number;
 };
 
+type PublicCamera = {
+  id: string;
+  name: string;
+  regionName: string;
+  street: string;
+  description: string;
+  lat: number;
+  lng: number;
+  movable: boolean;
+  publicUrl: string;
+  embedUrl: string;
+  hlsUrl: string;
+  sector: {
+    bearingDeg: number;
+    widthDeg: number;
+    radiusMeters: number;
+    polygon: Array<[number, number]>;
+  };
+};
+
 const diamondIcon = L.divIcon({
   className: "deep-diamond-marker",
   html: "<span></span>",
   iconSize: [18, 18],
   iconAnchor: [9, 9],
   popupAnchor: [0, -8]
+});
+
+const cameraIcon = L.divIcon({
+  className: "public-camera-marker",
+  html: "<span></span>",
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -10]
+});
+
+const selectedCameraIcon = L.divIcon({
+  className: "public-camera-marker public-camera-marker-selected",
+  html: "<span></span>",
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+  popupAnchor: [0, -12]
 });
 
 const defaultLayers: MapLayer[] = [];
@@ -107,6 +145,7 @@ const tools: Array<{
   { key: "info", label: "Info", Icon: Info },
   { key: "layers", label: "Layers", Icon: SlidersHorizontal },
   { key: "measure", label: "Measure", Icon: Ruler },
+  { key: "cameras", label: "Cameras", Icon: Video },
   { key: "weather", label: "Weather", Icon: Cloud },
   { key: "radiation", label: "Radiation", Icon: Radiation },
   { key: "fires", label: "Fires", Icon: Flame }
@@ -591,6 +630,37 @@ function MapController({ layers, isFullscreen }: { layers: MapLayer[]; isFullscr
   return null;
 }
 
+function CameraLayerController({
+  cameras,
+  activeTool,
+  isFullscreen
+}: {
+  cameras: PublicCamera[];
+  activeTool: ToolKey;
+  isFullscreen: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (activeTool !== "cameras" || !cameras.length) {
+      return;
+    }
+
+    const bounds = L.latLngBounds(cameras.map((camera) => [camera.lat, camera.lng] as [number, number]));
+    map.fitBounds(bounds.pad(0.2), {
+      animate: true,
+      maxZoom: 13
+    });
+  }, [activeTool, cameras, map]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => map.invalidateSize(), 250);
+    return () => window.clearTimeout(timeout);
+  }, [map, isFullscreen]);
+
+  return null;
+}
+
 function MapClickTarget({
   onMapClick
 }: {
@@ -628,6 +698,12 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
     "Air Defense": true,
     Missile: true
   });
+  const [publicCameras, setPublicCameras] = useState<PublicCamera[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [showPublicCameras, setShowPublicCameras] = useState(true);
+  const [showCameraSectors, setShowCameraSectors] = useState(true);
+  const [cameraLoading, setCameraLoading] = useState(true);
+  const [cameraError, setCameraError] = useState("");
 
   const activeToolTitle = useMemo(() => tools.find((tool) => tool.key === activeTool)?.label ?? "Layers", [
     activeTool
@@ -641,6 +717,41 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
     tacticalLocationTemplates.find((location) => location.id === selectedLocationId) ?? tacticalLocationTemplates[0];
   const allTacticalLocations = [...preloadedTacticalLocations, ...tacticalLocations];
   const visibleTacticalLocations = allTacticalLocations.filter((location) => locationFilters[location.type]);
+  const selectedCamera = selectedCameraId
+    ? publicCameras.find((camera) => camera.id === selectedCameraId) ?? null
+    : null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCameras() {
+      setCameraLoading(true);
+      setCameraError("");
+
+      try {
+        const response = await fetch("/api/cameras?cameraId=7", { signal: controller.signal });
+        const body = (await response.json()) as { cameras?: PublicCamera[]; error?: string };
+
+        if (!response.ok) {
+          throw new Error(body.error || "Camera layer failed to load.");
+        }
+
+        setPublicCameras(Array.isArray(body.cameras) ? body.cameras : []);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCameraError(error instanceof Error ? error.message : "Camera layer failed to load.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCameraLoading(false);
+        }
+      }
+    }
+
+    loadCameras();
+
+    return () => controller.abort();
+  }, []);
 
   function toggleLocationFilter(type: TacticalLocation["type"]) {
     setLocationFilters((filters) => ({ ...filters, [type]: !filters[type] }));
@@ -710,11 +821,26 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
         className="leaflet-stage"
       >
         <MapController layers={visibleLayers} isFullscreen={isFullscreen} />
+        <CameraLayerController cameras={publicCameras} activeTool={activeTool} isFullscreen={isFullscreen} />
         <MapClickTarget onMapClick={handleMapClick} />
         <TileLayer
           attribution='Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
+        {showPublicCameras && showCameraSectors
+          ? publicCameras.map((camera) => (
+              <Polygon
+                key={`camera-sector-${camera.id}`}
+                positions={camera.sector.polygon}
+                pathOptions={{
+                  color: selectedCameraId === camera.id ? "#75f0c8" : "#49b8ff",
+                  weight: selectedCameraId === camera.id ? 2 : 1,
+                  fillColor: selectedCameraId === camera.id ? "#75f0c8" : "#49b8ff",
+                  fillOpacity: selectedCameraId === camera.id ? 0.2 : 0.1
+                }}
+              />
+            ))
+          : null}
         {visibleLayers.map((layer) => (
           <div key={layer.id}>
             {showAreas ? (
@@ -789,6 +915,31 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
               </CircleMarker>
             ))
           : null}
+        {showPublicCameras
+          ? publicCameras.map((camera) => (
+              <Marker
+                eventHandlers={{
+                  click() {
+                    setSelectedCameraId(camera.id);
+                    setActiveTool("cameras");
+                  }
+                }}
+                icon={selectedCameraId === camera.id ? selectedCameraIcon : cameraIcon}
+                key={`public-camera-${camera.id}`}
+                position={[camera.lat, camera.lng]}
+              >
+                <Popup>
+                  <strong>{camera.regionName}</strong>
+                  <br />
+                  {camera.street}
+                  <br />
+                  {camera.description}
+                  <br />
+                  Sector: {Math.round(camera.sector.bearingDeg)} deg / {Math.round(camera.sector.radiusMeters)} m
+                </Popup>
+              </Marker>
+            ))
+          : null}
       </MapContainer>
       <button
         type="button"
@@ -831,6 +982,22 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
               <label>
                 <input type="checkbox" checked={showRanges} onChange={() => setShowRanges((value) => !value)} />
                 Range overlays
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showPublicCameras}
+                  onChange={() => setShowPublicCameras((value) => !value)}
+                />
+                Public cameras
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showCameraSectors}
+                  onChange={() => setShowCameraSectors((value) => !value)}
+                />
+                Camera sectors
               </label>
             </div>
             <div className="tactical-location-panel">
@@ -892,7 +1059,53 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
               ? `Active layer: ${visibleLayers[0].label}. Confidence: ${visibleLayers[0].confidence}. `
               : "Reference systems visible. "}
             Rings: {allRangeRings.length}. Locations: {visibleTacticalLocations.length}/{allTacticalLocations.length}.
+            Cameras: {publicCameras.length}.
           </p>
+        ) : null}
+        {activeTool === "cameras" ? (
+          <div className="camera-layer-panel">
+            <h3>Stage 1 public cameras</h3>
+            <div className="camera-status-row">
+              <span>{cameraLoading ? "Loading camera layer" : `${publicCameras.length} cameras loaded`}</span>
+              <em>{showCameraSectors ? "Sectors on" : "Sectors off"}</em>
+            </div>
+            {cameraError ? <p className="camera-error">{cameraError}</p> : null}
+            <div className="camera-toggle-grid">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showPublicCameras}
+                  onChange={() => setShowPublicCameras((value) => !value)}
+                />
+                Public cameras
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showCameraSectors}
+                  onChange={() => setShowCameraSectors((value) => !value)}
+                />
+                Estimated sectors
+              </label>
+            </div>
+            {selectedCamera ? (
+              <div className="selected-camera-card">
+                <span>{selectedCamera.regionName}</span>
+                <strong>{selectedCamera.street}</strong>
+                <p>{selectedCamera.description}</p>
+                <em>
+                  {Math.round(selectedCamera.sector.bearingDeg)} deg /{" "}
+                  {Math.round(selectedCamera.sector.widthDeg)} deg /{" "}
+                  {Math.round(selectedCamera.sector.radiusMeters)} m
+                </em>
+                <a href={selectedCamera.publicUrl} target="_blank" rel="noreferrer">
+                  Open source
+                </a>
+              </div>
+            ) : (
+              <p>Click a camera marker to open an embedded public stream preview.</p>
+            )}
+          </div>
         ) : null}
         {activeTool === "measure" ? (
           <div className="weapon-range-panel">
@@ -949,6 +1162,31 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
         ) : null}
         {activeTool === "fires" ? <p>Incident/fires layer placeholder active. No live incident feed is configured.</p> : null}
       </div>
+      {selectedCamera && showPublicCameras ? (
+        <div className="camera-preview-panel">
+          <div className="camera-preview-header">
+            <div>
+              <span>STAGE 1 CAMERA</span>
+              <strong>{selectedCamera.regionName}</strong>
+            </div>
+            <button type="button" aria-label="Close camera preview" onClick={() => setSelectedCameraId(null)}>
+              Back
+            </button>
+          </div>
+          <iframe
+            src={selectedCamera.embedUrl}
+            title={`Public camera ${selectedCamera.id}`}
+            allow="autoplay; fullscreen"
+          />
+          <div className="camera-preview-meta">
+            <span>{selectedCamera.street}</span>
+            <em>{selectedCamera.description}</em>
+            <a href={selectedCamera.publicUrl} target="_blank" rel="noreferrer">
+              Open source stream
+            </a>
+          </div>
+        </div>
+      ) : null}
       <div className="deep-search-card">
         <strong>AEROROZUM</strong>
         <span>
@@ -976,6 +1214,10 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
         <div>
           <span className="legend-swatch red" />
           Range overlay
+        </div>
+        <div>
+          <span className="legend-swatch cyan" />
+          Camera sector
         </div>
       </div>
     </div>
