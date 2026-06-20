@@ -104,7 +104,7 @@ const defaultLayers: MapLayer[] = [
     radiusMeters: 3600000,
     confidence: "medium",
     category: "context",
-    detail: "Country-scale context for preloaded reference layers. Submit text to create a focused review layer."
+    detail: "Country-scale reference layer."
   }
 ];
 
@@ -172,20 +172,20 @@ const weaponTemplates: WeaponTemplate[] = [
 
 const tacticalLocationTemplates: TacticalLocationTemplate[] = [
   {
-    id: "42-mrd",
-    name: "42nd Motorized Rifle Division",
+    id: "unit-reference",
+    name: "Ground formation reference",
     type: "Unit",
     status: "reference template",
-    sourceName: "Wikipedia",
-    sourceUrl: "https://en.wikipedia.org/wiki/42nd_Guards_Motor_Rifle_Division"
+    sourceName: "Reference source",
+    sourceUrl: "https://deepstatemap.live/en"
   },
   {
-    id: "buturlinovka-airfield",
-    name: "Buturlinovka airfield (Sign. Pryrodny)",
+    id: "airfield-reference",
+    name: "Airfield reference",
     type: "Airfield",
     status: "reference template",
-    sourceName: "Wikipedia",
-    sourceUrl: "https://en.wikipedia.org/wiki/Buturlinovka_(air_base)"
+    sourceName: "Reference source",
+    sourceUrl: "https://deepstatemap.live/en"
   },
   {
     id: "hq-reference",
@@ -318,7 +318,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-ad-01",
-    name: "Air-defense reference sector",
+    name: "Air-defense sector reference",
     type: "Air Defense",
     status: "preloaded reference",
     sourceName: "Public reference layer",
@@ -355,6 +355,56 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     sourceUrl: "https://deepstatemap.live/en",
     lat: 53.04,
     lng: 158.65
+  },
+  {
+    id: "ref-ad-03",
+    name: "Layered air-defense reference",
+    type: "Air Defense",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 51.67,
+    lng: 39.21
+  },
+  {
+    id: "ref-ad-04",
+    name: "Point-defense reference",
+    type: "Air Defense",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 58.01,
+    lng: 56.25
+  },
+  {
+    id: "ref-ad-05",
+    name: "Strategic air-defense reference",
+    type: "Air Defense",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 52.03,
+    lng: 113.5
+  },
+  {
+    id: "ref-missile-03",
+    name: "Missile unit reference",
+    type: "Missile",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 57.15,
+    lng: 65.53
+  },
+  {
+    id: "ref-missile-04",
+    name: "Missile operations reference",
+    type: "Missile",
+    status: "preloaded reference",
+    sourceName: "Public reference layer",
+    sourceUrl: "https://deepstatemap.live/en",
+    lat: 64.54,
+    lng: 40.54
   }
 ];
 
