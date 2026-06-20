@@ -114,47 +114,69 @@ const tools: Array<{
 
 const weaponTemplates: WeaponTemplate[] = [
   {
-    id: "s-300",
-    name: "S-300",
+    id: "s-300pm2",
+    name: "S-300PM2 Favorit",
     category: "Anti-aircraft",
     status: "in operation",
     readMore: "https://en.wikipedia.org/wiki/S-300_missile_system",
     projectiles: [
-      { id: "5v55r", name: "5В55Р", minKm: 0, maxKm: 90, status: "in operation" },
-      { id: "48n6", name: "48Н6", minKm: 0, maxKm: 200, status: "in operation" }
+      { id: "5v55r", name: "5V55R", minKm: 0, maxKm: 90, status: "in operation" },
+      { id: "48n6", name: "48N6", minKm: 0, maxKm: 200, status: "in operation" }
     ]
   },
   {
-    id: "patriot",
-    name: "Patriot",
+    id: "s-400",
+    name: "S-400 Triumf",
     category: "Anti-aircraft",
     status: "in operation",
-    readMore: "https://en.wikipedia.org/wiki/MIM-104_Patriot",
+    readMore: "https://en.wikipedia.org/wiki/S-400_missile_system",
     projectiles: [
-      { id: "pac-2", name: "PAC-2 / GEM-T", minKm: 0, maxKm: 160, status: "in operation" },
-      { id: "pac-3", name: "PAC-3 MSE", minKm: 0, maxKm: 60, status: "in operation" }
+      { id: "48n6dm", name: "48N6DM", minKm: 0, maxKm: 250, status: "in operation" },
+      { id: "40n6", name: "40N6", minKm: 0, maxKm: 400, status: "in operation" }
     ]
   },
   {
-    id: "nasams",
-    name: "NASAMS",
+    id: "s-500",
+    name: "S-500 Prometey",
     category: "Anti-aircraft",
     status: "in operation",
-    readMore: "https://en.wikipedia.org/wiki/NASAMS",
+    readMore: "https://en.wikipedia.org/wiki/S-500_missile_system",
     projectiles: [
-      { id: "aim-120", name: "AIM-120 AMRAAM", minKm: 2.5, maxKm: 40, status: "in operation" },
-      { id: "amraam-er", name: "AMRAAM-ER", minKm: 0, maxKm: 50, status: "in operation" }
+      { id: "77n6-n", name: "77N6-N", minKm: 0, maxKm: 500, status: "in operation" },
+      { id: "77n6-n1", name: "77N6-N1", minKm: 0, maxKm: 600, status: "in operation" }
     ]
   },
   {
-    id: "iris-t",
-    name: "IRIS-T",
+    id: "s-350",
+    name: "S-350 Vityaz",
     category: "Anti-aircraft",
     status: "in operation",
-    readMore: "https://en.wikipedia.org/wiki/IRIS-T",
+    readMore: "https://en.wikipedia.org/wiki/S-350E_Vityaz",
     projectiles: [
-      { id: "iris-t-slm", name: "IRIS-T SLM", minKm: 0, maxKm: 40, status: "in operation" },
-      { id: "iris-t-sls", name: "IRIS-T SLS", minKm: 0, maxKm: 12, status: "in operation" }
+      { id: "9m96", name: "9M96", minKm: 0, maxKm: 60, status: "in operation" },
+      { id: "9m96d", name: "9M96D", minKm: 0, maxKm: 120, status: "in operation" }
+    ]
+  },
+  {
+    id: "buk-m3",
+    name: "Buk-M3",
+    category: "Anti-aircraft",
+    status: "in operation",
+    readMore: "https://en.wikipedia.org/wiki/Buk_missile_system",
+    projectiles: [
+      { id: "9m317m", name: "9M317M", minKm: 0, maxKm: 70, status: "in operation" },
+      { id: "9r31m", name: "9R31M", minKm: 0, maxKm: 45, status: "in operation" }
+    ]
+  },
+  {
+    id: "pantsir-s1",
+    name: "Pantsir-S1",
+    category: "Anti-aircraft",
+    status: "in operation",
+    readMore: "https://en.wikipedia.org/wiki/Pantsir_missile_system",
+    projectiles: [
+      { id: "57e6", name: "57E6", minKm: 0, maxKm: 20, status: "in operation" },
+      { id: "57e6m", name: "57E6M", minKm: 0, maxKm: 30, status: "in operation" }
     ]
   }
 ];
@@ -405,7 +427,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-s300-01",
-    name: "S-300 reference system",
+    name: "S-300PM2 Favorit reference",
     type: "Air Defense",
     status: "reference system",
     sourceName: "System reference",
@@ -415,7 +437,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-s400-01",
-    name: "S-400 reference system",
+    name: "S-400 Triumf reference",
     type: "Air Defense",
     status: "reference system",
     sourceName: "System reference",
@@ -425,7 +447,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-pantsir-01",
-    name: "Pantsir-S1 reference system",
+    name: "Pantsir-S1 reference",
     type: "Air Defense",
     status: "reference system",
     sourceName: "System reference",
@@ -435,7 +457,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-buk-01",
-    name: "Buk reference system",
+    name: "Buk-M3 reference",
     type: "Air Defense",
     status: "reference system",
     sourceName: "System reference",
@@ -445,7 +467,7 @@ const preloadedTacticalLocations: TacticalLocation[] = [
   },
   {
     id: "ref-tor-01",
-    name: "Tor reference system",
+    name: "Tor-M2 reference",
     type: "Air Defense",
     status: "reference system",
     sourceName: "System reference",
@@ -462,6 +484,86 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     sourceUrl: "https://en.wikipedia.org/wiki/Air_defense",
     lat: 67.61,
     lng: 33.67
+  },
+  {
+    id: "ref-s400-02",
+    name: "S-400 Triumf long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-400_missile_system",
+    lat: 53.21,
+    lng: 50.14
+  },
+  {
+    id: "ref-s400-03",
+    name: "S-400 Triumf long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-400_missile_system",
+    lat: 62.14,
+    lng: 129.75
+  },
+  {
+    id: "ref-s500-01",
+    name: "S-500 Prometey long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-500_missile_system",
+    lat: 55.68,
+    lng: 84.95
+  },
+  {
+    id: "ref-s500-02",
+    name: "S-500 Prometey long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-500_missile_system",
+    lat: 59.41,
+    lng: 39.92
+  },
+  {
+    id: "ref-s350-01",
+    name: "S-350 Vityaz reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-350E_Vityaz",
+    lat: 56.11,
+    lng: 101.63
+  },
+  {
+    id: "ref-s350-02",
+    name: "S-350 Vityaz reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-350E_Vityaz",
+    lat: 50.28,
+    lng: 127.53
+  },
+  {
+    id: "ref-s300-02",
+    name: "S-300PM2 Favorit long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-300_missile_system",
+    lat: 65.03,
+    lng: 57.42
+  },
+  {
+    id: "ref-s300-03",
+    name: "S-300PM2 Favorit long-range reference",
+    type: "Air Defense",
+    status: "reference system",
+    sourceName: "System reference",
+    sourceUrl: "https://en.wikipedia.org/wiki/S-300_missile_system",
+    lat: 46.91,
+    lng: 142.74
   }
 ];
 
@@ -509,7 +611,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
   const [showMarkers, setShowMarkers] = useState(true);
   const [showAreas, setShowAreas] = useState(true);
   const [showRanges, setShowRanges] = useState(true);
-  const [selectedWeaponId, setSelectedWeaponId] = useState("s-300");
+  const [selectedWeaponId, setSelectedWeaponId] = useState("s-300pm2");
   const [selectedProjectileId, setSelectedProjectileId] = useState("5v55r");
   const [weaponPlacementArmed, setWeaponPlacementArmed] = useState(false);
   const [weaponRings, setWeaponRings] = useState<RangeRing[]>([]);
