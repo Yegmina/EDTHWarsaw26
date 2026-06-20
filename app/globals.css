@@ -695,12 +695,40 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(117, 240, 200, 0.34), 0 6px 16px rgba(0, 0, 0, 0.46);
 }
 
+.audio-sensor-marker {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.audio-sensor-marker span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(23, 12, 30, 0.96);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, transparent 42%, #f4f6ef 42% 58%, transparent 58%),
+    radial-gradient(circle at 50% 50%, #c77dff 0 56%, #17211c 58%);
+  box-shadow: 0 0 0 2px rgba(199, 125, 255, 0.26), 0 4px 12px rgba(0, 0, 0, 0.42);
+  transform: rotate(45deg);
+}
+
+.audio-sensor-marker-selected span {
+  width: 22px;
+  height: 22px;
+  background:
+    linear-gradient(90deg, transparent 42%, #06100c 42% 58%, transparent 58%),
+    radial-gradient(circle at 50% 50%, var(--amber) 0 56%, #17211c 58%);
+  box-shadow: 0 0 0 3px rgba(242, 184, 75, 0.34), 0 6px 16px rgba(0, 0, 0, 0.46);
+}
+
 .camera-layer-panel {
   display: grid;
   gap: 10px;
 }
 
-.camera-layer-panel h3 {
+.camera-layer-panel h3,
+.audio-layer-panel h3 {
   margin: 0;
   color: #17211c;
   font-size: 0.86rem;
@@ -708,13 +736,17 @@ button:disabled {
 
 .camera-status-row,
 .camera-toggle-grid,
-.selected-camera-card {
+.selected-camera-card,
+.audio-status-row,
+.audio-toggle-grid,
+.selected-audio-card {
   border: 1px solid rgba(23, 33, 28, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
 }
 
-.camera-status-row {
+.camera-status-row,
+.audio-status-row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -724,18 +756,21 @@ button:disabled {
   font-size: 0.68rem;
 }
 
-.camera-status-row em {
+.camera-status-row em,
+.audio-status-row em {
   font-style: normal;
 }
 
-.camera-toggle-grid {
+.camera-toggle-grid,
+.audio-toggle-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px;
   padding: 8px;
 }
 
-.camera-toggle-grid label {
+.camera-toggle-grid label,
+.audio-toggle-grid label {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -744,13 +779,21 @@ button:disabled {
   font-size: 0.72rem;
 }
 
-.camera-toggle-grid input {
+.camera-toggle-grid input,
+.audio-toggle-grid input {
   width: 14px;
   height: 14px;
   accent-color: #17211c;
 }
 
-.selected-camera-card {
+.camera-layer-panel,
+.audio-layer-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.selected-camera-card,
+.selected-audio-card {
   display: grid;
   gap: 5px;
   padding: 9px;
@@ -758,14 +801,18 @@ button:disabled {
 
 .selected-camera-card span,
 .selected-camera-card p,
-.selected-camera-card em {
+.selected-camera-card em,
+.selected-audio-card span,
+.selected-audio-card p,
+.selected-audio-card em {
   color: rgba(23, 33, 28, 0.68);
   font-size: 0.72rem;
   font-style: normal;
   line-height: 1.35;
 }
 
-.selected-camera-card strong {
+.selected-camera-card strong,
+.selected-audio-card strong {
   color: #17211c;
   font-size: 0.84rem;
 }
@@ -893,6 +940,11 @@ button:disabled {
 .legend-swatch.cyan {
   color: #49b8ff;
   background: rgba(73, 184, 255, 0.18);
+}
+
+.legend-swatch.purple {
+  color: #c77dff;
+  background: rgba(199, 125, 255, 0.18);
 }
 
 .map-overlay span {
