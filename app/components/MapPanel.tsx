@@ -99,12 +99,12 @@ const defaultLayers: MapLayer[] = [
   {
     id: "russia-context",
     label: "Russia context",
-    lat: 55.5,
-    lng: 61,
-    radiusMeters: 350000,
+    lat: 61.5,
+    lng: 92,
+    radiusMeters: 3600000,
     confidence: "medium",
     category: "context",
-    detail: "Baseline regional context. Submit text to create a focused review layer."
+    detail: "Country-scale context for preloaded reference layers. Submit text to create a focused review layer."
   }
 ];
 
@@ -213,8 +213,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.28,
-    lng: 38.1
+    lat: 54.71,
+    lng: 20.51
   },
   {
     id: "ref-unit-02",
@@ -223,8 +223,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 55.42,
-    lng: 36.82
+    lat: 59.93,
+    lng: 30.34
   },
   {
     id: "ref-unit-03",
@@ -233,8 +233,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 54.96,
-    lng: 38.84
+    lat: 55.76,
+    lng: 37.62
   },
   {
     id: "ref-hq-01",
@@ -243,8 +243,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.06,
-    lng: 37.18
+    lat: 47.24,
+    lng: 39.71
   },
   {
     id: "ref-hq-02",
@@ -253,8 +253,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 55.12,
-    lng: 37.52
+    lat: 48.71,
+    lng: 44.51
   },
   {
     id: "ref-airfield-01",
@@ -263,8 +263,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.44,
-    lng: 39.28
+    lat: 56.84,
+    lng: 60.61
   },
   {
     id: "ref-airfield-02",
@@ -273,8 +273,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 55.82,
-    lng: 35.98
+    lat: 55.03,
+    lng: 82.92
   },
   {
     id: "ref-airfield-03",
@@ -283,8 +283,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 54.62,
-    lng: 37.18
+    lat: 52.29,
+    lng: 104.28
   },
   {
     id: "ref-log-01",
@@ -293,8 +293,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.72,
-    lng: 36.84
+    lat: 54.99,
+    lng: 73.37
   },
   {
     id: "ref-log-02",
@@ -303,8 +303,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 55.68,
-    lng: 39.82
+    lat: 56.01,
+    lng: 92.87
   },
   {
     id: "ref-log-03",
@@ -313,8 +313,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 54.42,
-    lng: 36.32
+    lat: 62.03,
+    lng: 129.73
   },
   {
     id: "ref-ad-01",
@@ -323,8 +323,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.1,
-    lng: 40.14
+    lat: 68.97,
+    lng: 33.08
   },
   {
     id: "ref-ad-02",
@@ -333,8 +333,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 55.22,
-    lng: 39.1
+    lat: 43.12,
+    lng: 131.89
   },
   {
     id: "ref-missile-01",
@@ -343,8 +343,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 56.52,
-    lng: 37.62
+    lat: 50.55,
+    lng: 137.0
   },
   {
     id: "ref-missile-02",
@@ -353,8 +353,8 @@ const preloadedTacticalLocations: TacticalLocation[] = [
     status: "preloaded reference",
     sourceName: "Public reference layer",
     sourceUrl: "https://deepstatemap.live/en",
-    lat: 54.82,
-    lng: 40.24
+    lat: 53.04,
+    lng: 158.65
   }
 ];
 
@@ -372,7 +372,9 @@ function MapController({ layers, isFullscreen }: { layers: MapLayer[]; isFullscr
       return;
     }
 
-    map.setView([focused.lat, focused.lng], focused.radiusMeters > 100000 ? 4 : 9, {
+    const zoom = focused.radiusMeters > 1500000 ? 3 : focused.radiusMeters > 100000 ? 4 : 9;
+
+    map.setView([focused.lat, focused.lng], zoom, {
       animate: true
     });
   }, [layers, map]);
