@@ -1,19 +1,30 @@
+// app/page.tsx
+
 "use client";
 
 import dynamic from "next/dynamic";
 import { FormEvent, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
+  Brain,
+  Crosshair,
   Database,
   FileSearch,
   Globe2,
   Image as ImageIcon,
+  Layers,
   Loader2,
   Radar,
   Ruler,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
+import { StrikePlanner } from "./components/StrikePlanner";
+import { ManualPlanInput } from "./components/ManualPlanInput";
+import { PostStrikeAnalysis } from "./components/PostStrikeAnalysis";
+import { AnalysisDashboard } from "./components/AnalysisDashboard";
 
 const MapPanel = dynamic(() => import("./components/MapPanel").then((mod) => mod.MapPanel), {
   ssr: false,
@@ -65,6 +76,8 @@ type RangeRing = {
   radiusMeters: number;
 };
 
+type PipelineStage = "stage-0" | "stage-1" | "stage-2" | "stage-3";
+
 const sampleInput = `Source: private analyst note
 Claim: 5 Pantsir air-defense systems are positioned around the Red Square perimeter in Moscow.
 Time observed: not stated.
@@ -91,6 +104,7 @@ const emptyResult: AnalysisResult = {
 };
 
 export default function Home() {
+  // Stage 0 state
   const [rawText, setRawText] = useState("");
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -102,6 +116,15 @@ export default function Home() {
   const [rangeRings, setRangeRings] = useState<RangeRing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Pipeline state
+  const [activeStage, setActiveStage] = useState<PipelineStage>("stage-0");
+  const [strikeRecommendation, setStrikeRecommendation] = useState<any>(null);
+  const [postStrikeData, setPostStrikeData] = useState<any>(null);
+
+  // Manual plan state
+  const [manualPlanMode, setManualPlanMode] = useState(false);
+  const [agentAnalysis, setAgentAnalysis] = useState<any>(null);
 
   const inputStats = useMemo(() => {
     const words = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
@@ -150,248 +173,490 @@ export default function Home() {
     ]);
   }
 
+  function handleStageChange(stage: PipelineStage) {
+    setActiveStage(stage);
+    // Reset manual plan mode when leaving Stage 1
+    if (stage !== "stage-1") {
+      setManualPlanMode(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="command-bar">
         <div>
           <div className="eyebrow">AeroRozum / Warsaw26</div>
-          <h1>Zero Stage Current-State Intake</h1>
+          <h1>Intelligence Analysis Pipeline</h1>
+        </div>
+        <div className="pipeline-stages">
+          <button
+            className={`stage-button ${activeStage === "stage-0" ? "stage-active" : ""}`}
+            onClick={() => handleStageChange("stage-0")}
+          >
+            <Layers size={16} />
+            Stage 0
+            <span>Intake</span>
+          </button>
+          <div className="stage-connector" />
+          <button
+            className={`stage-button ${activeStage === "stage-1" ? "stage-active" : ""}`}
+            onClick={() => handleStageChange("stage-1")}
+          >
+            <TrendingUp size={16} />
+            Stage 1
+            <span>Plan</span>
+          </button>
+          <div className="stage-connector" />
+          <button
+            className={`stage-button ${activeStage === "stage-2" ? "stage-active" : ""}`}
+            onClick={() => handleStageChange("stage-2")}
+          >
+            <Radar size={16} />
+            Stage 2
+            <span>Collect</span>
+          </button>
+          <div className="stage-connector" />
+          <button
+            className={`stage-button ${activeStage === "stage-3" ? "stage-active" : ""}`}
+            onClick={() => handleStageChange("stage-3")}
+          >
+            <BarChart3 size={16} />
+            Stage 3
+            <span>Analyze</span>
+          </button>
         </div>
         <div className="status-strip">
           <span>
             <ShieldCheck size={16} />
-            LLM analysis engine
+            Analytical Platform
           </span>
           <span>
             <Globe2 size={16} />
-            Satellite basemap
-          </span>
-          <span>
-            <Radar size={16} />
-            Range tools
+            Multi-Source Intel
           </span>
         </div>
       </section>
 
-      <section className="dashboard-grid">
-        <form className="panel input-panel" onSubmit={handleAnalyze}>
-          <div className="panel-header">
-            <div>
-              <span className="panel-kicker">Stage 0</span>
-              <h2>Current Information</h2>
+      {/* Stage 0: Current-State Intake */}
+      {activeStage === "stage-0" && (
+        <section className="dashboard-grid">
+          <form className="panel input-panel" onSubmit={handleAnalyze}>
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Stage 0</span>
+                <h2>Current Information</h2>
+              </div>
+              <Database size={20} />
             </div>
-            <Database size={20} />
-          </div>
 
-          <label>
-            Source title
-            <input
-              value={sourceTitle}
-              onChange={(event) => setSourceTitle(event.target.value)}
-              placeholder="Analyst notes, OSINT packet, field report..."
-            />
-          </label>
-
-          <label>
-            Source URL
-            <input
-              value={sourceUrl}
-              onChange={(event) => setSourceUrl(event.target.value)}
-              placeholder="Optional link kept as source context"
-            />
-          </label>
-
-          <label>
-            Evidence image URL
-            <input
-              value={imageUrl}
-              onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="Optional image link shown with the brief"
-            />
-          </label>
-
-          <label className="textarea-label">
-            Current-state text
-            <textarea
-              value={rawText}
-              onChange={(event) => setRawText(event.target.value)}
-              placeholder="Paste exact claim text, quantities, equipment names, place names, time phrases, source notes, and evidence gaps..."
-            />
-          </label>
-
-          <div className="input-footer">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => {
-                setSourceTitle("Private analyst note");
-                setRawText(sampleInput);
-              }}
-            >
-              Load sample
-            </button>
-            <div className="telemetry">
-              {inputStats.words} words / {inputStats.chars} chars
-            </div>
-            <button type="submit" disabled={isLoading || !rawText.trim()}>
-              {isLoading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-              Analyze
-            </button>
-          </div>
-          {error ? (
-            <div className="error-line">
-              <AlertTriangle size={16} />
-              {error}
-            </div>
-          ) : null}
-        </form>
-
-        <section className="panel map-panel">
-          <div className="panel-header">
-            <div>
-              <span className="panel-kicker">Geospatial Context</span>
-              <h2>Russia Satellite View</h2>
-            </div>
-            <Globe2 size={20} />
-          </div>
-          <MapPanel
-            layers={analysis.mapLayers}
-            rangeRings={rangeRings}
-            onRangeAnchorChange={setRangeAnchor}
-          />
-          <div className="range-console">
-            <div className="range-title">
-              <Ruler size={17} />
-              Range overlay
-            </div>
             <label>
-              Ring label
+              Source title
               <input
-                value={rangeLabel}
-                onChange={(event) => setRangeLabel(event.target.value)}
-                placeholder="Custom range"
+                value={sourceTitle}
+                onChange={(event) => setSourceTitle(event.target.value)}
+                placeholder="Analyst notes, OSINT packet, field report..."
               />
             </label>
+
             <label>
-              Radius, km
+              Source URL
               <input
-                type="number"
-                min={1}
-                max={2000}
-                value={rangeKm}
-                onChange={(event) => setRangeKm(Number(event.target.value))}
+                value={sourceUrl}
+                onChange={(event) => setSourceUrl(event.target.value)}
+                placeholder="Optional link kept as source context"
               />
             </label>
-            <div className="range-actions">
-              <span>
-                Anchor {rangeAnchor.lat.toFixed(3)}, {rangeAnchor.lng.toFixed(3)}
-              </span>
-              <button type="button" onClick={handleAddRangeRing}>
-                Add range
-              </button>
-              <button type="button" className="ghost-button" onClick={() => setRangeRings([])}>
-                Clear
-              </button>
-            </div>
-          </div>
-        </section>
 
-        <section className="panel brief-panel">
-          <div className="panel-header">
-            <div>
-              <span className="panel-kicker">LLM Output</span>
-              <h2>Analyst Brief</h2>
+            <label>
+              Evidence image URL
+              <input
+                value={imageUrl}
+                onChange={(event) => setImageUrl(event.target.value)}
+                placeholder="Optional image link shown with the brief"
+              />
+            </label>
+
+            <label className="textarea-label">
+              Current-state text
+              <textarea
+                value={rawText}
+                onChange={(event) => setRawText(event.target.value)}
+                placeholder="Paste exact claim text, quantities, equipment names, place names, time phrases, source notes, and evidence gaps..."
+              />
+            </label>
+
+            <div className="input-footer">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  setSourceTitle("Private analyst note");
+                  setRawText(sampleInput);
+                }}
+              >
+                Load sample
+              </button>
+              <div className="telemetry">
+                {inputStats.words} words / {inputStats.chars} chars
+              </div>
+              <button type="submit" disabled={isLoading || !rawText.trim()}>
+                {isLoading ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                Analyze
+              </button>
             </div>
-            <FileSearch size={20} />
-          </div>
-          <p className="brief-text">{analysis.brief}</p>
-          {imageUrl.trim() ? (
-            <figure className="evidence-image">
-              <img src={imageUrl.trim()} alt="Evidence source preview" />
-              <figcaption>
-                <ImageIcon size={14} />
-                Source image preview
-              </figcaption>
-            </figure>
-          ) : null}
-          {analysis.evidenceCards.length ? (
-            <div className="evidence-cards">
-              {analysis.evidenceCards.map((card) => (
-                <a href={card.url} target="_blank" rel="noreferrer" key={`${card.source}-${card.url}`}>
-                  {card.imageUrl ? <img src={card.imageUrl} alt="" /> : <div className="image-fallback" />}
+            {error ? (
+              <div className="error-line">
+                <AlertTriangle size={16} />
+                {error}
+              </div>
+            ) : null}
+          </form>
+
+          <section className="panel map-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Geospatial Context</span>
+                <h2>Russia Satellite View</h2>
+              </div>
+              <Globe2 size={20} />
+            </div>
+            <MapPanel
+              layers={analysis.mapLayers}
+              rangeRings={rangeRings}
+              onRangeAnchorChange={setRangeAnchor}
+            />
+            <div className="range-console">
+              <div className="range-title">
+                <Ruler size={17} />
+                Range overlay
+              </div>
+              <label>
+                Ring label
+                <input
+                  value={rangeLabel}
+                  onChange={(event) => setRangeLabel(event.target.value)}
+                  placeholder="Custom range"
+                />
+              </label>
+              <label>
+                Radius, km
+                <input
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={rangeKm}
+                  onChange={(event) => setRangeKm(Number(event.target.value))}
+                />
+              </label>
+              <div className="range-actions">
+                <span>
+                  Anchor {rangeAnchor.lat.toFixed(3)}, {rangeAnchor.lng.toFixed(3)}
+                </span>
+                <button type="button" onClick={handleAddRangeRing}>
+                  Add range
+                </button>
+                <button type="button" className="ghost-button" onClick={() => setRangeRings([])}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel brief-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">LLM Output</span>
+                <h2>Analyst Brief</h2>
+              </div>
+              <FileSearch size={20} />
+            </div>
+            <p className="brief-text">{analysis.brief}</p>
+            {imageUrl.trim() ? (
+              <figure className="evidence-image">
+                <img src={imageUrl.trim()} alt="Evidence source preview" />
+                <figcaption>
+                  <ImageIcon size={14} />
+                  Source image preview
+                </figcaption>
+              </figure>
+            ) : null}
+            {analysis.evidenceCards.length ? (
+              <div className="evidence-cards">
+                {analysis.evidenceCards.map((card) => (
+                  <a href={card.url} target="_blank" rel="noreferrer" key={`${card.source}-${card.url}`}>
+                    {card.imageUrl ? <img src={card.imageUrl} alt="" /> : <div className="image-fallback" />}
+                    <div>
+                      <span>{card.source}</span>
+                      <strong>{card.title}</strong>
+                      <p>{card.description}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : null}
+            <div className="confidence-row">
+              <span>Source confidence</span>
+              <strong className={`confidence confidence-${analysis.confidence}`}>{analysis.confidence}</strong>
+            </div>
+            {analysis.safetyFlags.length ? (
+              <div className="safety-box">
+                <AlertTriangle size={17} />
+                <span>{analysis.safetyFlags.join(", ")}</span>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="panel observations-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Extraction</span>
+                <h2>Observations</h2>
+              </div>
+              <Radar size={20} />
+            </div>
+            <div className="observation-list">
+              {analysis.observations.map((observation, index) => (
+                <article className="observation-card" key={`${observation.label}-${index}`}>
                   <div>
-                    <span>{card.source}</span>
-                    <strong>{card.title}</strong>
-                    <p>{card.description}</p>
+                    <h3>{observation.label}</h3>
+                    <span>{observation.source}</span>
                   </div>
-                </a>
+                  <p>{observation.detail}</p>
+                  <strong className={`confidence confidence-${observation.confidence}`}>
+                    {observation.confidence}
+                  </strong>
+                </article>
               ))}
             </div>
-          ) : null}
-          <div className="confidence-row">
-            <span>Source confidence</span>
-            <strong className={`confidence confidence-${analysis.confidence}`}>{analysis.confidence}</strong>
-          </div>
-          {analysis.safetyFlags.length ? (
-            <div className="safety-box">
-              <AlertTriangle size={17} />
-              <span>{analysis.safetyFlags.join(", ")}</span>
-            </div>
-          ) : null}
-        </section>
+          </section>
 
-        <section className="panel observations-panel">
-          <div className="panel-header">
-            <div>
-              <span className="panel-kicker">Extraction</span>
-              <h2>Observations</h2>
+          <section className="panel gaps-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Review</span>
+                <h2>Gaps & Questions</h2>
+              </div>
+              <AlertTriangle size={20} />
             </div>
-            <Radar size={20} />
-          </div>
-          <div className="observation-list">
-            {analysis.observations.map((observation, index) => (
-              <article className="observation-card" key={`${observation.label}-${index}`}>
-                <div>
-                  <h3>{observation.label}</h3>
-                  <span>{observation.source}</span>
-                </div>
-                <p>{observation.detail}</p>
-                <strong className={`confidence confidence-${observation.confidence}`}>
-                  {observation.confidence}
-                </strong>
-              </article>
-            ))}
-          </div>
+            <div className="two-column-list">
+              <div>
+                <h3>Source gaps</h3>
+                <ul>
+                  {analysis.sourceGaps.map((gap, index) => (
+                    <li key={`${gap}-${index}`}>{gap}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3>Verification questions</h3>
+                <ul>
+                  {analysis.verificationQuestions.map((question, index) => (
+                    <li key={`${question}-${index}`}>{question}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
         </section>
+      )}
 
-        <section className="panel gaps-panel">
-          <div className="panel-header">
-            <div>
-              <span className="panel-kicker">Review</span>
-              <h2>Gaps & Questions</h2>
+      {/* Stage 1: Strike Parameter Recommendation */}
+      {activeStage === "stage-1" && (
+        <section className="stage-1-container">
+          <div className="stage-options">
+            <div className="mode-toggle">
+              <button
+                className={`mode-button ${!manualPlanMode ? "mode-active" : ""}`}
+                onClick={() => {
+                  setManualPlanMode(false);
+                  setAgentAnalysis(null);
+                }}
+              >
+                <Crosshair size={16} />
+                Automated Recommendation
+              </button>
+              <button
+                className={`mode-button ${manualPlanMode ? "mode-active" : ""}`}
+                onClick={() => {
+                  setManualPlanMode(true);
+                  setStrikeRecommendation(null);
+                }}
+              >
+                <Brain size={16} />
+                Manual Plan Input
+              </button>
             </div>
-            <AlertTriangle size={20} />
+            {manualPlanMode && agentAnalysis && (
+              <div className="agent-analysis-status">
+                <Brain size={14} />
+                <span>Agent Analysis Complete</span>
+                <strong>{agentAnalysis.agentAnalysis?.confidenceLevel || "?"}% confidence</strong>
+              </div>
+            )}
           </div>
-          <div className="two-column-list">
-            <div>
-              <h3>Source gaps</h3>
-              <ul>
-                {analysis.sourceGaps.map((gap, index) => (
-                  <li key={`${gap}-${index}`}>{gap}</li>
-                ))}
-              </ul>
+
+          <div className="dashboard-grid">
+            {!manualPlanMode ? (
+              <StrikePlanner 
+                onRecommendationComplete={(rec) => {
+                  setStrikeRecommendation(rec);
+                }} 
+              />
+            ) : (
+              <ManualPlanInput
+                onPlanAnalyzed={(analysis) => {
+                  setAgentAnalysis(analysis);
+                  if (analysis.integratedRecommendation) {
+                    setStrikeRecommendation(analysis.integratedRecommendation);
+                  }
+                }}
+              />
+            )}
+          </div>
+
+          {strikeRecommendation && (
+            <div className="stage-navigation">
+              <div className="nav-message">
+                <CheckCircle size={16} />
+                <span>Strike parameters ready. Proceed to Stage 2 for post-strike data collection.</span>
+              </div>
+              <button
+                className="next-stage-button"
+                onClick={() => handleStageChange("stage-2")}
+              >
+                Continue to Stage 2
+                <ArrowRight size={16} />
+              </button>
             </div>
-            <div>
-              <h3>Verification questions</h3>
-              <ul>
-                {analysis.verificationQuestions.map((question, index) => (
-                  <li key={`${question}-${index}`}>{question}</li>
-                ))}
-              </ul>
+          )}
+        </section>
+      )}
+
+      {/* Stage 2: Post-Strike Data Collection */}
+      {activeStage === "stage-2" && strikeRecommendation && (
+        <section className="stage-2-container">
+          <div className="dashboard-grid">
+            <PostStrikeAnalysis
+              recommendation={strikeRecommendation}
+              onAnalysisComplete={(data) => {
+                setPostStrikeData(data);
+              }}
+            />
+          </div>
+
+          {postStrikeData && (
+            <div className="stage-navigation">
+              <div className="nav-message">
+                <CheckCircle size={16} />
+                <span>Post-strike analysis complete. Proceed to Stage 3 for conclusions.</span>
+              </div>
+              <button
+                className="next-stage-button"
+                onClick={() => handleStageChange("stage-3")}
+              >
+                Continue to Stage 3
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Stage 3: Analysis Conclusions */}
+      {activeStage === "stage-3" && strikeRecommendation && postStrikeData && (
+        <section className="stage-3-container">
+          <div className="dashboard-grid">
+            <AnalysisDashboard
+              recommendation={strikeRecommendation}
+              postStrikeData={postStrikeData}
+            />
+          </div>
+
+          <div className="stage-navigation">
+            <div className="nav-message">
+              <CheckCircle size={16} />
+              <span>Pipeline complete. All stages have been processed successfully.</span>
+            </div>
+            <button
+              className="next-stage-button secondary"
+              onClick={() => handleStageChange("stage-0")}
+            >
+              Start New Analysis
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Placeholder for stages without data */}
+      {activeStage === "stage-2" && !strikeRecommendation && (
+        <section className="dashboard-grid">
+          <div className="panel placeholder-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Stage 2</span>
+                <h2>Post-Strike Data Collection</h2>
+              </div>
+              <AlertTriangle size={20} />
+            </div>
+            <div className="placeholder-content">
+              <Radar size={48} className="placeholder-icon" />
+              <p>Please complete Stage 1 first to generate strike parameters.</p>
+              <p className="placeholder-hint">This stage collects multi-source intelligence data for post-strike analysis.</p>
+              <button 
+                className="action-button"
+                onClick={() => handleStageChange("stage-1")}
+              >
+                Go to Stage 1
+              </button>
             </div>
           </div>
         </section>
-      </section>
+      )}
+
+      {activeStage === "stage-3" && (!strikeRecommendation || !postStrikeData) && (
+        <section className="dashboard-grid">
+          <div className="panel placeholder-panel">
+            <div className="panel-header">
+              <div>
+                <span className="panel-kicker">Stage 3</span>
+                <h2>Analysis Conclusions</h2>
+              </div>
+              <AlertTriangle size={20} />
+            </div>
+            <div className="placeholder-content">
+              <BarChart3 size={48} className="placeholder-icon" />
+              <p>Please complete Stages 1 and 2 first to generate analysis data.</p>
+              <p className="placeholder-hint">This stage provides strategic insights and lessons learned from the collected data.</p>
+              <button 
+                className="action-button"
+                onClick={() => handleStageChange("stage-1")}
+              >
+                Go to Stage 1
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
+  );
+}
+
+// Need to import these for the stage navigation
+function CheckCircle({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+  );
+}
+
+function ArrowRight({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
   );
 }
