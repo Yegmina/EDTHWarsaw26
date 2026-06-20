@@ -76,8 +76,8 @@ function cameraSector(marker: InetcomMarker, lat: number, lng: number) {
     regionLat !== null && regionLng !== null ? bearingBetween(lat, lng, regionLat, regionLng) : fallbackBearing;
   const jitter = ((seed >> 8) % 41) - 20;
   const movable = marker.movable === "1";
-  const widthDeg = movable ? 105 + ((seed >> 16) % 31) : 55 + ((seed >> 16) % 21);
-  const radiusMeters = movable ? 520 + ((seed >> 20) % 260) : 280 + ((seed >> 20) % 220);
+  const widthDeg = movable ? 110 + ((seed >> 16) % 31) : 65 + ((seed >> 16) % 26);
+  const radiusMeters = movable ? 1400 + ((seed >> 20) % 700) : 850 + ((seed >> 20) % 550);
   const bearingDeg = (baseBearing + jitter + 360) % 360;
   const left = destinationPoint(lat, lng, bearingDeg - widthDeg / 2, radiusMeters);
   const center = destinationPoint(lat, lng, bearingDeg, radiusMeters * 1.15);

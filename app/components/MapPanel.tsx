@@ -120,16 +120,16 @@ const diamondIcon = L.divIcon({
 const cameraIcon = L.divIcon({
   className: "public-camera-marker",
   html: "<span></span>",
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
   popupAnchor: [0, -10]
 });
 
 const selectedCameraIcon = L.divIcon({
   className: "public-camera-marker public-camera-marker-selected",
   html: "<span></span>",
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
   popupAnchor: [0, -12]
 });
 
@@ -647,9 +647,11 @@ function CameraLayerController({
     }
 
     const bounds = L.latLngBounds(cameras.map((camera) => [camera.lat, camera.lng] as [number, number]));
-    map.fitBounds(bounds.pad(0.2), {
+    map.fitBounds(bounds.pad(0.32), {
       animate: true,
-      maxZoom: 13
+      maxZoom: 12,
+      paddingBottomRight: [40, 120],
+      paddingTopLeft: [360, 70]
     });
   }, [activeTool, cameras, map]);
 
@@ -677,7 +679,7 @@ function MapClickTarget({
 
 export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelProps) {
   const visibleLayers = layers.length ? layers : defaultLayers;
-  const [activeTool, setActiveTool] = useState<ToolKey>("layers");
+  const [activeTool, setActiveTool] = useState<ToolKey>("cameras");
   const [showMarkers, setShowMarkers] = useState(true);
   const [showAreas, setShowAreas] = useState(true);
   const [showRanges, setShowRanges] = useState(true);
@@ -834,9 +836,9 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
                 positions={camera.sector.polygon}
                 pathOptions={{
                   color: selectedCameraId === camera.id ? "#75f0c8" : "#49b8ff",
-                  weight: selectedCameraId === camera.id ? 2 : 1,
+                  weight: selectedCameraId === camera.id ? 3 : 2,
                   fillColor: selectedCameraId === camera.id ? "#75f0c8" : "#49b8ff",
-                  fillOpacity: selectedCameraId === camera.id ? 0.2 : 0.1
+                  fillOpacity: selectedCameraId === camera.id ? 0.28 : 0.18
                 }}
               />
             ))
@@ -927,6 +929,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
                 icon={selectedCameraId === camera.id ? selectedCameraIcon : cameraIcon}
                 key={`public-camera-${camera.id}`}
                 position={[camera.lat, camera.lng]}
+                zIndexOffset={selectedCameraId === camera.id ? 1200 : 1000}
               >
                 <Popup>
                   <strong>{camera.regionName}</strong>
@@ -1196,11 +1199,13 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
       </div>
       <div className="map-overlay top-left">
         <span>LIVE SATELLITE BASEMAP</span>
-        <strong>{visibleLayers[0]?.label ?? "Air-defense reference layer"}</strong>
+        <strong>
+          {activeTool === "cameras" ? "Public camera layer" : visibleLayers[0]?.label ?? "Air-defense reference layer"}
+        </strong>
       </div>
       <div className="map-overlay bottom-right">
-        <span>RANGE TOOL</span>
-        <strong>Click map to set anchor</strong>
+        <span>{activeTool === "cameras" ? "CAMERA LAYER" : "RANGE TOOL"}</span>
+        <strong>{activeTool === "cameras" ? "Click camera to preview" : "Click map to set anchor"}</strong>
       </div>
       <div className="deep-legend">
         <div>
