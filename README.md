@@ -15,7 +15,7 @@ The application turns unstructured source notes into a structured analyst brief,
 - Public camera layer loaded through `/api/cameras`, including estimated camera sectors and stream preview links.
 - Distributed audio sensor layer with coverage visualization.
 - Fullscreen map mode and layer/tool controls.
-- Stage 2 video damage assessment with whole-video frame extraction at the selected FPS, visual change boxes, smoke/fire/dust indicators, annotated MP4 output, frame timeline, and GPT-5.5 vision review.
+- Stage 2 video damage assessment with whole-video frame extraction at the selected FPS, frame-to-frame delta proposals, visual change boxes, smoke/fire/dust indicators, annotated MP4 output, frame timeline, and GPT-5.5 vision review.
 - Supplied MP4 workflow plus uploaded video processing through server-side API routes.
 - Stage 2 controls for frame-processing concurrency and video mode: auto, visual/RGB, thermal/IR, or mixed RGB + thermal.
 
@@ -97,7 +97,7 @@ Loads public camera markers from the configured provider and returns normalized 
 
 `POST /api/video-assessments`
 
-Accepts multipart video uploads or `supplied=true`. Extracts frames across the full video at the selected FPS, runs local visual-change analysis, optionally runs GPT-5.5 frame review, generates an annotated MP4, and returns severity, smoke/fire/dust evidence, boxes, events, frame URLs, and video output URLs.
+Accepts multipart video uploads or `supplied=true`. Extracts frames across the full video at the selected FPS, runs local frame-delta analysis first, classifies rapid-change regions as flash/heat, smoke, dust, or motion-delta proposals, optionally runs GPT-5.5 frame review on the highest-delta evidence, generates an annotated MP4, and returns severity, smoke/fire/dust evidence, boxes, events, frame URLs, and video output URLs.
 
 Settings include `fps`, `eventSensitivity`, `openAiFrameLimit`, `processingConcurrency`, and `videoMode`. `processingConcurrency` controls parallel server-side frame decoding and has no fixed upper cap in the API; `videoMode` is passed into the vision-review prompt so thermal, visual, and mixed footage are interpreted differently.
 

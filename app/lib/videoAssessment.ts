@@ -70,7 +70,7 @@ type OpenAiParsedReview = {
 };
 
 export const defaultAssessmentSettings: AssessmentSettings = {
-  fps: 1,
+  fps: 4,
   eventSensitivity: 0.35,
   openAiFrameLimit: 8,
   processingConcurrency: 4,
@@ -277,7 +277,29 @@ function analyzeFramePixels(
 ) {
   const pixels = frame.width * frame.height;
   const channels = Math.max(3, Math.round(frame.data.length / pixels));
-  const diffThreshold = 42 - settings.eventSensitivity * 22;
+  const hasPrevious = Boolean(previous && previous !== frame.data);
+  const hasBaseline = Boolean(baseline && baseline !== frame.data);
+  const deltaHistogram = new Uint32Array(256);
+  const deltaValues = new Uint8Array(pixels);
+  let deltaSum = 0;
+  let deltaMax = 0;
+
+  for (let index = 0; index < pixels; index += 1) {
+    const offset = index * channels;
+    const delta = hasPrevious && previous ? colorDistance(frame.data, previous, offset, channels) : 0;
+    const capped = Math.min(255, Math.round(delta));
+    deltaValues[index] = capped;
+    deltaHistogram[capped] += 1;
+    deltaSum += capped;
+    deltaMax = Math.max(deltaMax, capped);
+  }
+
+  const deltaThreshold = hasPrevious
+    ? adaptiveDeltaThreshold(deltaHistogram, pixels, settings.eventSensitivity)
+    : Number.POSITIVE_INFINITY;
+  const slowDeltaThreshold = deltaThreshold * 0.45;
+  const baselineThreshold = deltaThreshold * 1.15;
+  const rapidMask = new Uint8Array(pixels);
   const fireMask = new Uint8Array(pixels);
   const smokeMask = new Uint8Array(pixels);
   const dustMask = new Uint8Array(pixels);
@@ -298,11 +320,17 @@ function analyzeFramePixels(
     const avg = (r + g + b) / 3;
     brightnessSum += avg;
 
-    const baseChanged = baseline ? colorDistance(frame.data, baseline, offset, channels) > diffThreshold : false;
-    const prevChanged = previous ? colorDistance(frame.data, previous, offset, channels) > diffThreshold * 0.7 : false;
-    const isChanged = baseChanged || prevChanged;
+    const prevDelta = deltaValues[index];
+    const baseChanged =
+      hasBaseline && baseline ? colorDistance(frame.data, baseline, offset, channels) > baselineThreshold : false;
+    const prevChanged = hasPrevious && prevDelta >= deltaThreshold;
+    const slowButPersistent = baseChanged && prevDelta >= slowDeltaThreshold;
+    const isChanged = prevChanged || slowButPersistent;
     if (isChanged) {
       changed += 1;
+    }
+    if (prevChanged) {
+      rapidMask[index] = 1;
     }
 
     const max = Math.max(r, g, b);
@@ -310,11 +338,14 @@ function analyzeFramePixels(
     const grayish = max - min < 48;
     const warm = r > 150 && g > 82 && b < 130 && r > b * 1.45;
     const hotFlash = r > 210 && g > 130 && b < 120 && r > b * 1.8;
+    const brightDelta =
+      hasPrevious && previous ? avg - ((previous[offset] ?? 0) + (previous[offset + 1] ?? 0) + (previous[offset + 2] ?? 0)) / 3 : 0;
     const whiteGraySmoke = grayish && avg > 82 && avg < 232 && isChanged;
     const darkSmoke = grayish && avg > 35 && avg <= 110 && isChanged;
     const tanDust = r > 112 && g > 92 && b < 126 && r > b * 1.12 && Math.abs(r - g) < 58 && isChanged;
+    const rapidThermalHotspot = prevChanged && brightDelta > 34 && avg > 132;
 
-    if ((warm || hotFlash) && isChanged) {
+    if ((warm || hotFlash || rapidThermalHotspot) && isChanged) {
       fireMask[index] = 1;
       fire += 1;
     }
@@ -331,23 +362,34 @@ function analyzeFramePixels(
     }
   }
 
-  const boxes = [
+  const cleanedRapidMask = cleanMotionMask(rapidMask, frame.width, frame.height);
+  const classifiedBoxes = [
     ...boxesForMask(fireMask, frame.width, frame.height, "explosion_flash", pixels * 0.00012, "#ffcc48"),
     ...boxesForMask(smokeMask, frame.width, frame.height, "smoke", pixels * 0.0012, "#c9d2d0"),
     ...boxesForMask(dustMask, frame.width, frame.height, "dust", pixels * 0.001, "#caa46b")
-  ].map((box, index) => ({
+  ];
+  const motionBoxes = boxesForMask(
+    cleanedRapidMask.mask,
+    frame.width,
+    frame.height,
+    "motion_delta",
+    pixels * 0.00016,
+    "#49f4ff"
+  )
+    .filter((box) => classifiedBoxes.every((classified) => boxIntersectionRatio(box, classified) < 0.35))
+    .slice(0, 3);
+  const boxes = [...classifiedBoxes, ...motionBoxes].map((box, index) => ({
     ...box,
     id: `${frame.id}-${box.label}-${index}`,
-    detail:
-      box.label === "explosion_flash"
-        ? "Rapid warm/bright visual change consistent with flash or flame evidence."
-        : box.label === "smoke"
-          ? "Low-saturation changed plume area consistent with smoke evidence."
-          : "Changed tan plume area consistent with dust/debris evidence."
+    detail: detailForLocalBox(box.label)
   }));
 
+  const rapidChangeRatio = cleanedRapidMask.count / pixels;
   const metrics: FrameMetrics = {
     changeRatio: changed / pixels,
+    rapidChangeRatio,
+    deltaScore: Math.min(1, rapidChangeRatio * 11 + (deltaSum / pixels / 255) * 0.7 + (deltaMax / 255) * 0.22),
+    meanDelta: deltaSum / pixels / 255,
     fireRatio: fire / pixels,
     smokeRatio: smoke / pixels,
     dustRatio: dust / pixels,
@@ -356,6 +398,55 @@ function analyzeFramePixels(
   };
 
   return { boxes, metrics };
+}
+
+function adaptiveDeltaThreshold(histogram: Uint32Array, totalPixels: number, sensitivity: number) {
+  const p92 = histogramPercentile(histogram, totalPixels, 0.92);
+  const p985 = histogramPercentile(histogram, totalPixels, 0.985);
+  const floor = 30 - sensitivity * 16;
+  const adaptive = Math.max(floor, Math.min(p985, p92 + 12));
+  return Math.max(14, Math.min(86, adaptive));
+}
+
+function histogramPercentile(histogram: Uint32Array, totalPixels: number, percentile: number) {
+  const target = Math.max(1, Math.ceil(totalPixels * percentile));
+  let running = 0;
+  for (let value = 0; value < histogram.length; value += 1) {
+    running += histogram[value] ?? 0;
+    if (running >= target) {
+      return value;
+    }
+  }
+  return histogram.length - 1;
+}
+
+function cleanMotionMask(mask: Uint8Array, width: number, height: number) {
+  const cleaned = new Uint8Array(mask.length);
+  let count = 0;
+
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const index = y * width + x;
+      if (!mask[index]) {
+        continue;
+      }
+      let neighbors = 0;
+      for (let yy = -1; yy <= 1; yy += 1) {
+        for (let xx = -1; xx <= 1; xx += 1) {
+          if (xx === 0 && yy === 0) {
+            continue;
+          }
+          neighbors += mask[index + yy * width + xx] ? 1 : 0;
+        }
+      }
+      if (neighbors >= 2) {
+        cleaned[index] = 1;
+        count += 1;
+      }
+    }
+  }
+
+  return { mask: cleaned, count };
 }
 
 function boxesForMask(
@@ -436,9 +527,35 @@ function boxesForMask(
     .map(({ area: _area, ...box }) => box);
 }
 
+function boxIntersectionRatio(a: DetectionBox, b: DetectionBox) {
+  const x0 = Math.max(a.x, b.x);
+  const y0 = Math.max(a.y, b.y);
+  const x1 = Math.min(a.x + a.width, b.x + b.width);
+  const y1 = Math.min(a.y + a.height, b.y + b.height);
+  const width = Math.max(0, x1 - x0);
+  const height = Math.max(0, y1 - y0);
+  const intersection = width * height;
+  const smaller = Math.max(0.000001, Math.min(a.width * a.height, b.width * b.height));
+  return intersection / smaller;
+}
+
+function detailForLocalBox(label: DetectionLabel) {
+  return {
+    motion_delta: "Frame-to-frame delta component: rapid local change proposed before visual classification.",
+    explosion_flash: "Rapid warm/bright visual change consistent with flash or heat evidence.",
+    fire: "Warm visual region consistent with fire evidence.",
+    smoke: "Low-saturation changed plume area consistent with smoke evidence.",
+    dust: "Changed tan plume area consistent with dust/debris evidence.",
+    structural_damage: "Persistent changed structure region proposed by local CV.",
+    vehicle_or_object: "Changed object region proposed by local CV.",
+    possible_person: "Person-shaped region proposed by local CV.",
+    unknown: "Unclassified local visual-change evidence."
+  }[label];
+}
+
 function buildEvents(frames: VideoFrameAssessment[]): VideoEvent[] {
   return frames
-    .filter((frame) => frame.boxes.length > 0 || frame.metrics.changeRatio > 0.08)
+    .filter((frame) => frame.boxes.length > 0 || frame.metrics.deltaScore > 0.18 || frame.metrics.rapidChangeRatio > 0.006)
     .map((frame, index) => {
       const labels = uniqueLabels(frame.boxes.map((box) => box.label));
       const severity = frameSeverity(frame);
@@ -449,7 +566,9 @@ function buildEvents(frames: VideoFrameAssessment[]): VideoEvent[] {
           ? "Smoke plume visible"
           : labels.includes("dust")
             ? "Dust/debris plume visible"
-            : "Scene change detected";
+            : labels.includes("motion_delta")
+              ? "Rapid frame-delta change"
+              : "Scene change detected";
       return {
         id: `event-${index + 1}`,
         frameId: frame.id,
@@ -460,6 +579,8 @@ function buildEvents(frames: VideoFrameAssessment[]): VideoEvent[] {
         confidence: confidenceFromBoxes(frame.boxes),
         boxes: frame.boxes,
         notes: [
+          `Rapid delta ${(frame.metrics.rapidChangeRatio * 100).toFixed(1)}%`,
+          `Delta score ${frame.metrics.deltaScore.toFixed(2)}`,
           `Frame change ${(frame.metrics.changeRatio * 100).toFixed(1)}%`,
           frame.metrics.smokeColor !== "none" ? `Smoke color: ${frame.metrics.smokeColor}` : ""
         ].filter(Boolean)
@@ -496,6 +617,7 @@ async function reviewFramesWithOpenAi(
 
   const selected = selectFramesForOpenAi(rawFrames, frames, events, settings.openAiFrameLimit);
   const videoModeInstruction = videoModePrompt(settings.videoMode);
+  const frameById = new Map(frames.map((frame) => [frame.id, frame]));
   const prompt = [
     "You are a video evidence assessment analyst.",
     "Analyze only visible evidence in these extracted video frames.",
@@ -505,6 +627,8 @@ async function reviewFramesWithOpenAi(
     "For thermal or mixed footage, interpret color palettes as relative heat contrast; do not treat thermal hot colors as visible flame unless RGB/visual evidence supports it.",
     "For smoke color, use visible RGB evidence only. If only thermal evidence is available, mark smoke color as unknown and explain the limitation.",
     "When thermal and RGB disagree, report both observations and keep severity tied to visible evidence, not hidden inference.",
+    "The local pre-pass uses frame-to-frame delta first, then classifies rapid-change regions as flash/heat, smoke, dust, or unclassified motion_delta proposals.",
+    "Treat local delta boxes as candidate regions to verify, correct, or reject from the image evidence; do not copy them blindly.",
     "Return damage assessment evidence: bounding boxes, smoke/fire/dust/explosion indicators, smoke color, people-risk indicators, severity, confidence, and verification gaps.",
     "Do not provide targeting, strike correction, weapon-use, evasion, routing, or future attack recommendations.",
     "Do not infer hidden objects, precise geolocation, unit identity, casualties, or intent.",
@@ -518,17 +642,24 @@ async function reviewFramesWithOpenAi(
     '  "smokeExtent": "none|localized|expanding|heavy|unknown",',
     '  "peopleRisk": {"level":"none_visible|possible|elevated|unknown","indicators":["visible indicators"],"rationale":"visible evidence only","confidence":"low|medium|high"},',
     '  "observations": ["specific video observations"],',
-    '  "events": [{"frameId":"frame_0001","timeSec":0,"title":"event title","severity":"none|minor|moderate|severe|unknown","labels":["explosion_flash|fire|smoke|dust|structural_damage|vehicle_or_object|possible_person|unknown"],"boxes":[{"label":"smoke","x":0.1,"y":0.2,"width":0.3,"height":0.2,"confidence":0.72,"detail":"visible evidence"}],"notes":["uncertainty or gap"]}]',
+    '  "events": [{"frameId":"frame_0001","timeSec":0,"title":"event title","severity":"none|minor|moderate|severe|unknown","labels":["motion_delta","explosion_flash","smoke"],"boxes":[{"label":"smoke","x":0.1,"y":0.2,"width":0.3,"height":0.2,"confidence":0.72,"detail":"visible evidence"}],"notes":["uncertainty or gap"]}]',
     "}",
     "",
     "Available frame IDs and timestamps:",
-    ...selected.map((frame) => `${frame.id}: ${frame.timeSec.toFixed(2)}s`)
+    ...selected.map((frame) => `${frame.id}: ${frame.timeSec.toFixed(2)}s`),
+    "",
+    "Local delta candidates:",
+    ...selected.map((frame) => openAiCandidateLine(frameById.get(frame.id)))
   ].join("\n");
 
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }];
   for (const frame of selected) {
+    const localFrame = frameById.get(frame.id);
     const image = await readFile(frame.absolutePath);
-    content.push({ type: "input_text", text: `Frame ${frame.id} at ${frame.timeSec.toFixed(2)} seconds` });
+    content.push({
+      type: "input_text",
+      text: `Frame ${frame.id} at ${frame.timeSec.toFixed(2)} seconds. ${openAiCandidateLine(localFrame)}`
+    });
     content.push({
       type: "input_image",
       image_url: `data:image/jpeg;base64,${image.toString("base64")}`
@@ -640,7 +771,7 @@ function mergeAssessment(input: {
       error: input.openAiReview.error
     },
     processing: {
-      localCvVersion: "color-change-v1",
+      localCvVersion: "frame-delta-v2",
       frameCount: input.frames.length,
       ffmpeg: true,
       processingConcurrency: input.settings.processingConcurrency,
@@ -760,6 +891,9 @@ function ffmpegColor(color: string) {
 }
 
 function labelTextForVideo(label: DetectionLabel) {
+  if (label === "motion_delta") {
+    return "motion delta";
+  }
   return label === "explosion_flash" ? "flash heat" : label.replaceAll("_", " ");
 }
 
@@ -830,7 +964,9 @@ function selectFramesForOpenAi(
     .map((frame) => ({
       frame,
       score:
-        frame.metrics.changeRatio * 1.4 +
+        frame.metrics.deltaScore * 1.8 +
+        frame.metrics.rapidChangeRatio * 4 +
+        frame.metrics.changeRatio * 0.8 +
         frame.metrics.smokeRatio * 8 +
         frame.metrics.fireRatio * 18 +
         frame.metrics.dustRatio * 5 +
@@ -853,6 +989,24 @@ function selectFramesForOpenAi(
     }
   }
   return [...chosen.values()].sort((a, b) => a.timeSec - b.timeSec);
+}
+
+function openAiCandidateLine(frame: VideoFrameAssessment | undefined) {
+  if (!frame) {
+    return "No local delta candidate metadata available.";
+  }
+  const boxes = frame.boxes.length
+    ? frame.boxes
+        .slice(0, 8)
+        .map(
+          (box) =>
+            `${box.label} x=${box.x.toFixed(3)} y=${box.y.toFixed(3)} w=${box.width.toFixed(3)} h=${box.height.toFixed(3)} c=${box.confidence.toFixed(2)}`
+        )
+        .join("; ")
+    : "none";
+  return `${frame.id}: deltaScore=${frame.metrics.deltaScore.toFixed(3)}, rapidDelta=${(
+    frame.metrics.rapidChangeRatio * 100
+  ).toFixed(1)}%, meanDelta=${frame.metrics.meanDelta.toFixed(3)}, localBoxes=${boxes}`;
 }
 
 function normalizeOpenAiEvents(events: NonNullable<OpenAiParsedReview["events"]>): VideoEvent[] {
@@ -933,7 +1087,9 @@ function normalizePeopleRisk(
 
 function frameSeverity(frame: VideoFrameAssessment): DamageSeverity {
   const score =
-    frame.metrics.changeRatio * 0.9 +
+    frame.metrics.deltaScore * 0.55 +
+    frame.metrics.rapidChangeRatio * 3 +
+    frame.metrics.changeRatio * 0.55 +
     frame.metrics.fireRatio * 18 +
     frame.metrics.smokeRatio * 7 +
     frame.metrics.dustRatio * 4;
@@ -995,6 +1151,7 @@ function mostCommon(values: string[]) {
 
 function validLabel(label: unknown): DetectionLabel | undefined {
   const labels: DetectionLabel[] = [
+    "motion_delta",
     "explosion_flash",
     "fire",
     "smoke",
@@ -1046,6 +1203,7 @@ function videoModePrompt(mode: VideoMode) {
 
 function colorForLabel(label: DetectionLabel) {
   return {
+    motion_delta: "#49f4ff",
     explosion_flash: "#ffcc48",
     fire: "#ff7a45",
     smoke: "#c9d2d0",

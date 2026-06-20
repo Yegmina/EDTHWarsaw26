@@ -1,6 +1,7 @@
 export type DamageSeverity = "none" | "minor" | "moderate" | "severe" | "unknown";
 
 export type DetectionLabel =
+  | "motion_delta"
   | "explosion_flash"
   | "fire"
   | "smoke"
@@ -37,6 +38,9 @@ export type DetectionBox = {
 
 export type FrameMetrics = {
   changeRatio: number;
+  rapidChangeRatio: number;
+  deltaScore: number;
+  meanDelta: number;
   fireRatio: number;
   smokeRatio: number;
   dustRatio: number;

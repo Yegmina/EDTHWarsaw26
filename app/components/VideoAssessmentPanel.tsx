@@ -24,7 +24,7 @@ import type {
 const suppliedVideoUrl = "/demo/video_2026-06-20_20-14-28.mp4";
 
 const defaultSettings: AssessmentSettings = {
-  fps: 1,
+  fps: 4,
   eventSensitivity: 0.35,
   openAiFrameLimit: 8,
   processingConcurrency: 4,
@@ -52,6 +52,9 @@ function severityClass(value: DamageSeverity) {
 }
 
 function labelText(label: string) {
+  if (label === "motion_delta") {
+    return "motion delta";
+  }
   if (label === "explosion_flash") {
     return "flash / heat";
   }
@@ -410,6 +413,10 @@ export function VideoAssessmentPanel() {
             <article>
               <span>Vision review</span>
               <strong>{result?.openAiReview.status ?? "pending"}</strong>
+            </article>
+            <article>
+              <span>Local pass</span>
+              <strong>{result?.processing.localCvVersion ?? "frame-delta-v2"}</strong>
             </article>
             <article>
               <span>Model</span>
