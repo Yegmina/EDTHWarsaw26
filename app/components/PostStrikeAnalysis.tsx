@@ -49,7 +49,7 @@ const initialSources: EvidenceSourceInput[] = [
     label: "Video review",
     status: "confirmed",
     confidence: 82,
-    summary: "Visible blast effects and sustained smoke plume"
+    summary: "Visible blast effects and sustained scene change"
   },
   {
     id: "source-camera",
@@ -57,7 +57,7 @@ const initialSources: EvidenceSourceInput[] = [
     label: "Public camera layer",
     status: "supporting",
     confidence: 70,
-    summary: "Public camera layer indicates change in scene brightness and plume development"
+    summary: "Public camera layer indicates change in scene brightness and persistent scene change"
   },
   {
     id: "source-audio",
@@ -86,7 +86,7 @@ const initialTimeline = [
   {
     time: "T+15m",
     label: "Camera sweep",
-    detail: "Public camera layer reviewed for plume, flash, or scene-change indicators."
+    detail: "Public camera layer reviewed for flash or scene-change indicators."
   },
   {
     time: "T+60m",

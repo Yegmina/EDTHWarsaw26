@@ -38,7 +38,7 @@ The Stage 2 video panel runs in the browser:
 - full-clip frame-delta analysis
 - live canvas boxes over the video during playback
 - event jump list with timestamps, class labels, and scores
-- optional server-side OpenAI interpretation of detector metadata and keyframe thumbnails
+- optional server-side Vision LLM interpretation of detector metadata and keyframe thumbnails
 - automatic evidence-matrix update with confidence and summary
 
 ## Session Handling

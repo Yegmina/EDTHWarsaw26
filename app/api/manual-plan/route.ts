@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // If OpenAI key is available, use LLM analysis
+    // If a Vision LLM key is available, use LLM analysis
     if (apiKey) {
       try {
         const prompt = [
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         }).finally(() => clearTimeout(timeout));
 
         if (!openAiResponse.ok) {
-          throw new Error(`OpenAI manual analysis failed with ${openAiResponse.status}`);
+          throw new Error(`Vision LLM manual analysis failed with ${openAiResponse.status}`);
         }
 
         const openAiBody = await openAiResponse.json();

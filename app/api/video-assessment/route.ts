@@ -20,7 +20,7 @@ type VideoAssessmentRequest = {
 };
 
 type VideoAssessmentResult = {
-  provider: "openai" | "local";
+  provider: "vision-llm" | "local";
   confidence: number;
   damageLevel: "none-observed" | "possible" | "probable" | "severe" | "unknown";
   summary: string;
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
           ...localVideoAssessment(payload),
           provider: "local",
           uncertainties: [
-            "OpenAI video interpretation was unavailable; local detector summary was used.",
+            "Vision LLM interpretation was unavailable; local detector summary was used.",
             extractApiError(body)
           ].filter(Boolean)
         },
@@ -120,7 +120,7 @@ function buildPrompt(payload: Required<VideoAssessmentRequest>) {
     '  "damageLevel": "none-observed" | "possible" | "probable" | "severe" | "unknown",',
     '  "summary": "2-4 sentence assessment",',
     '  "observations": ["specific visible observations"],',
-    '  "visualIndicators": ["flash, smoke, thermal bloom, plume, scene change, etc"],',
+    '  "visualIndicators": ["flash, smoke, thermal bloom, scene change, etc"],',
     '  "uncertainties": ["limitations and gaps"],',
     '  "recommendedReviewActions": ["non-operational review actions only"]',
     "}",
@@ -200,7 +200,7 @@ function normalizeResult(value: Record<string, unknown>, payload: Required<Video
   const damageLevel = value.damageLevel;
 
   return {
-    provider: "openai",
+    provider: "vision-llm",
     confidence: Math.min(100, Math.max(0, Math.round(numberValue(value.confidence, fallback.confidence)))),
     damageLevel:
       damageLevel === "none-observed" ||

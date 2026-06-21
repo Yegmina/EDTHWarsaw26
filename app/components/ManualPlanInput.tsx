@@ -172,7 +172,7 @@ const initialCollectionWindows: ManualCollectionWindow[] = [
     source: "video",
     offsetMin: 0,
     durationMin: 4,
-    objective: "Capture thermal/RGB event frames, plume onset, and visible scene change"
+    objective: "Capture thermal/RGB event frames and visible scene change"
   },
   {
     id: "window-2",

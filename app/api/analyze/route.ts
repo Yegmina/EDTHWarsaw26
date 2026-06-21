@@ -319,7 +319,7 @@ export async function POST(request: Request) {
   if (!openAiResponse.ok) {
     return NextResponse.json(
       {
-        error: "OpenAI analysis failed.",
+        error: "Vision LLM analysis failed.",
         detail:
           typeof openAiBody === "object" &&
           openAiBody !== null &&

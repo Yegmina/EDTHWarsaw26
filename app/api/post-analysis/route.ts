@@ -132,7 +132,7 @@ function normalizeTimeline(timeline: TimelineInput[] | undefined): PostStrikeDat
     {
       time: "T+15m",
       label: "Camera sweep",
-      detail: "Public camera layer reviewed for plume, flash, or scene-change indicators."
+      detail: "Public camera layer reviewed for flash or scene-change indicators."
     },
     {
       time: "T+60m",
@@ -161,7 +161,7 @@ function inferStatus(
   if (confirmedCount >= 2 && confidence >= 82 && /\b(destroyed|neutralized|collapsed|fully engulfed|catastrophic|total loss)\b/.test(combinedText)) {
     return "destroyed";
   }
-  if (supportingCount + confirmedCount >= 1 || /\b(partial|damaged|smoke|plume|secondary|burning|blast|fire)\b/.test(combinedText)) {
+  if (supportingCount + confirmedCount >= 1 || /\b(partial|damaged|smoke|scene change|secondary|burning|blast|fire)\b/.test(combinedText)) {
     return "partially-damaged";
   }
   return confidence >= 88 && confirmedCount >= 2 ? "destroyed" : "unknown";

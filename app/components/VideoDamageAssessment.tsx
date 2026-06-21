@@ -15,7 +15,7 @@ type VideoDamageAssessmentProps = {
 };
 
 type SourceMode = "rgb" | "thermal" | "mixed";
-type EventKind = "flash" | "thermal-spike" | "plume-motion" | "scene-change";
+type EventKind = "flash" | "thermal-spike" | "scene-change";
 
 type DetectionEvent = {
   id: string;
@@ -37,7 +37,7 @@ type FrameSample = {
 };
 
 type VideoInterpretation = {
-  provider: "openai" | "local";
+  provider: "vision-llm" | "local";
   confidence: number;
   damageLevel: "none-observed" | "possible" | "probable" | "severe" | "unknown";
   summary: string;
@@ -78,7 +78,7 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
         acc[event.kind] += 1;
         return acc;
       },
-      { flash: 0, "thermal-spike": 0, "plume-motion": 0, "scene-change": 0 }
+      { flash: 0, "thermal-spike": 0, "scene-change": 0 }
     );
 
     return Object.entries(counts)
@@ -284,7 +284,7 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
             <article>
               <ScanLine size={15} />
               <span>AI Brief</span>
-              <strong>{isInterpreting ? "running" : interpretation ? interpretation.provider : "pending"}</strong>
+              <strong>{isInterpreting ? "running" : interpretation ? providerLabel(interpretation.provider) : "pending"}</strong>
             </article>
           </div>
 
@@ -313,8 +313,8 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
           {interpretation ? (
             <div className="video-interpretation">
               <div>
-                <strong>{interpretation.damageLevel.replace("-", " ")}</strong>
-                <span>{interpretation.provider} / {interpretation.confidence}%</span>
+                <strong>{assessmentLabel(interpretation, events.length)}</strong>
+                <span>{providerLabel(interpretation.provider)} / {interpretation.confidence}%</span>
               </div>
               <p>{interpretation.summary}</p>
               <ul>
@@ -466,7 +466,7 @@ function classifyEvent(sourceMode: SourceMode, brightRatio: number, luminanceDel
   if (changeRatio > 0.09) {
     return "scene-change";
   }
-  return "plume-motion";
+  return "scene-change";
 }
 
 function frameToSample(data: Uint8ClampedArray, time: number, sourceMode: SourceMode): FrameSample {
@@ -537,7 +537,7 @@ async function requestVideoInterpretation(payload: {
 }
 
 function normalizeVideoInterpretation(
-  value: Partial<VideoInterpretation>,
+  value: Omit<Partial<VideoInterpretation>, "provider"> & { provider?: string },
   payload: {
     sourceMode: SourceMode;
     duration: number;
@@ -547,7 +547,7 @@ function normalizeVideoInterpretation(
   const fallback = localInterpretation(payload.events, payload.duration, payload.sourceMode);
   const damageLevel = value.damageLevel;
   return {
-    provider: value.provider === "openai" ? "openai" : "local",
+    provider: value.provider === "openai" || value.provider === "vision-llm" ? "vision-llm" : "local",
     confidence: boundedNumber(value.confidence, fallback.confidence, 0, 100),
     damageLevel:
       damageLevel === "none-observed" ||
@@ -663,7 +663,7 @@ function buildAssessmentSummary(
     ? Array.from(new Set(events.slice(0, 8).map((event) => event.kind.replace("-", " ")))).join(", ")
     : "no high-confidence delta events";
   const interpretedSummary = interpretation
-    ? `${interpretation.provider.toUpperCase()} interpretation: ${interpretation.summary}`
+    ? `${providerLabel(interpretation.provider)} interpretation: ${interpretation.summary}`
     : "";
 
   return {
@@ -718,6 +718,17 @@ function drawOverlay(video: HTMLVideoElement, canvas: HTMLCanvasElement, events:
     context.font = "12px Cascadia Mono, Consolas, monospace";
     context.fillText(`${event.kind.replace("-", " ")} / ${event.score}%`, x + 7, Math.max(15, y - 8));
   }
+}
+
+function providerLabel(provider: VideoInterpretation["provider"]) {
+  return provider === "vision-llm" ? "Vision LLM" : "Local detector";
+}
+
+function assessmentLabel(interpretation: VideoInterpretation, eventCount: number) {
+  if (eventCount > 0 && interpretation.confidence >= 50 && interpretation.damageLevel !== "none-observed") {
+    return "Strike confirmed";
+  }
+  return interpretation.damageLevel.replace("-", " ");
 }
 
 function waitForVideoMetadata(video: HTMLVideoElement) {
