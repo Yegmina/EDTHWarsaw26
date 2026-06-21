@@ -9,6 +9,9 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ManualPlanInput;
     const trajectory = Array.isArray(payload.trajectory) ? payload.trajectory : [];
+    const setupItems = Array.isArray(payload.setupItems) ? payload.setupItems : [];
+    const collectionWindows = Array.isArray(payload.collectionWindows) ? payload.collectionWindows : [];
+    const routeSummary = summarizeTrajectory(trajectory);
 
     if (!payload.planTitle || !payload.targetDescription) {
       return NextResponse.json(
@@ -39,7 +42,10 @@ export async function POST(request: Request) {
         `Plan Title: ${payload.planTitle}`,
         `Target: ${payload.targetDescription}`,
         `Coordinates: ${payload.coordinates.lat}, ${payload.coordinates.lng}`,
-        `Trajectory: ${trajectory.map((point) => `${point.etaOffsetMin}min ${point.label} ${point.action} ${point.lat},${point.lng} alt=${point.altitudeM}m speed=${point.speedKmh}kmh notes=${point.notes}`).join(" | ")}`,
+        `Trajectory Summary: ${routeSummary}`,
+        `Trajectory: ${trajectory.map((point) => `${point.etaOffsetMin}min ${point.label} ${point.action} ${point.lat},${point.lng} alt=${point.altitudeM}m speed=${point.speedKmh}kmh heading=${point.headingDeg} hold=${point.holdSeconds}s sensor=${point.sensorMode} handoff=${point.handoff} notes=${point.notes}`).join(" | ")}`,
+        `Setup Items: ${setupItems.map((item) => `${item.label} owner=${item.owner} status=${item.status} notes=${item.notes}`).join(" | ")}`,
+        `Collection Windows: ${collectionWindows.map((window) => `T+${window.offsetMin}m ${window.label} source=${window.source} duration=${window.durationMin}m objective=${window.objective}`).join(" | ")}`,
         `Approach Strategy: ${payload.approachStrategy}`,
         `Timing: ${payload.timingConsiderations}`,
         `AD Avoidance: ${payload.adAvoidanceStrategy}`,
@@ -96,26 +102,32 @@ export async function POST(request: Request) {
         feasibilityScore: 72,
         riskAssessment: "medium",
         strengths: [
-          "Manual plan provides operational context",
-          "Operator expertise reflected in approach strategy",
-          "Clear target description and coordinates provided"
+          `Manual package includes ${trajectory.length} trajectory checkpoints with timing, sensor, and handoff metadata`,
+          `${setupItems.filter((item) => item.status === "ready").length} setup items are marked ready for review`,
+          `${collectionWindows.length} collection windows are available for post-event evidence fusion`
         ],
         weaknesses: [
           "Limited real-time intelligence integration",
           "Environmental factors may change during execution",
           "AD avoidance strategy requires satellite confirmation",
-          "Trajectory assumptions require timing and sensor deconfliction checks"
+          "Trajectory assumptions require timing and sensor deconfliction checks",
+          ...setupItems
+            .filter((item) => item.status !== "ready")
+            .slice(0, 2)
+            .map((item) => `${item.label} remains ${item.status}`)
         ],
         recommendedModifications: [
           "Integrate real-time weather data before execution",
           "Confirm AD positions via satellite imagery",
           "Add contingency routing for dynamic threats",
-          "Review each trajectory checkpoint against source freshness and collection windows"
+          "Review each trajectory checkpoint against source freshness and collection windows",
+          "Tie each post-event evidence window to a named owner and retained raw source reference"
         ],
         alternativeApproaches: [
           "Consider multi-axis approach for redundancy",
           "Evaluate standoff engagement options",
-          "Assess feasibility of coordinated timing windows"
+          "Assess feasibility of coordinated timing windows",
+          "Use a checkpoint-only dry run to validate telemetry, source windows, and handoff timing"
         ],
         confidenceLevel: 68,
         analysisTimestamp: new Date().toISOString()
@@ -136,12 +148,29 @@ function normalizeRisk(value: unknown): RiskLevel {
   return value === "low" || value === "medium" || value === "high" || value === "critical" ? value : "medium";
 }
 
+function summarizeTrajectory(trajectory: ManualPlanInput["trajectory"]) {
+  if (!trajectory.length) {
+    return "No trajectory checkpoints submitted.";
+  }
+
+  const sensorGates = trajectory.filter((point) => point.sensorMode && point.sensorMode !== "none").length;
+  const handoffs = trajectory.filter((point) => point.handoff?.trim()).length;
+  const firstEta = Math.min(...trajectory.map((point) => Number(point.etaOffsetMin) || 0));
+  const lastEta = Math.max(...trajectory.map((point) => Number(point.etaOffsetMin) || 0));
+
+  return `${trajectory.length} checkpoints over ${Math.max(0, lastEta - firstEta)} minutes; ${sensorGates} sensor gates; ${handoffs} handoffs.`;
+}
+
 function recommendationFromManualPlan(
   payload: ManualPlanInput,
   confidenceScore: number,
   riskLevel: RiskLevel
 ): StrikeRecommendation {
   const trajectory = Array.isArray(payload.trajectory) ? payload.trajectory : [];
+  const setupItems = Array.isArray(payload.setupItems) ? payload.setupItems : [];
+  const collectionWindows = Array.isArray(payload.collectionWindows) ? payload.collectionWindows : [];
+  const blockedSetup = setupItems.filter((item) => item.status === "blocked");
+  const pendingSetup = setupItems.filter((item) => item.status === "pending");
   return {
     id: `manual-rec-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -156,17 +185,24 @@ function recommendationFromManualPlan(
     rationale: [
       "Manual plan accepted and converted into pipeline parameters.",
       "Agent review produced a bounded confidence score and risk category.",
+      `${trajectory.length} route checkpoints, ${setupItems.length} setup items, and ${collectionWindows.length} collection windows were retained for audit.`,
       "Stage 2 should collect independent post-event evidence before conclusions."
     ],
     constraints: [
       payload.adAvoidanceStrategy || "Defensive coverage notes require review.",
       payload.environmentalNotes || "Environmental assumptions require update before assessment.",
-      payload.additionalContext || "Additional source context not provided."
+      payload.additionalContext || "Additional source context not provided.",
+      ...blockedSetup.map((item) => `Blocked setup item: ${item.label}`),
+      ...pendingSetup.slice(0, 2).map((item) => `Pending setup item: ${item.label}`)
     ],
     intelligenceGaps: [
       "Manual plan source metadata requires review.",
       "Independent imagery and sensor confirmation are required.",
-      "Any conflicting reports should be retained for Stage 3 analysis."
+      "Any conflicting reports should be retained for Stage 3 analysis.",
+      ...collectionWindows
+        .filter((window) => !String(window.objective ?? "").trim())
+        .slice(0, 2)
+        .map((window) => `Collection objective missing for ${window.label}`)
     ],
     trajectory,
     setupChecklist: [
@@ -175,15 +211,25 @@ function recommendationFromManualPlan(
       `Comms plan: ${payload.commsPlan || "not specified"}`,
       `Abort criteria: ${payload.abortCriteria || "not specified"}`,
       `Fallback plan: ${payload.fallbackPlan || "not specified"}`,
-      `BDA collection: ${payload.bdaCollectionPlan || "not specified"}`
+      `BDA collection: ${payload.bdaCollectionPlan || "not specified"}`,
+      ...setupItems.map((item) => `${String(item.status ?? "pending").toUpperCase()}: ${item.label} - ${item.owner}`),
+      ...collectionWindows.map(
+        (window) => `T+${window.offsetMin}m/${window.durationMin}m ${window.source}: ${window.label}`
+      )
     ],
     selectedParameters: {
       routeProfile: trajectory.length
-        ? `${trajectory.length} checkpoint trajectory: ${trajectory.map((point) => point.label).join(" -> ")}`
+        ? `${trajectory.length} checkpoint trajectory: ${trajectory.map((point) => `${point.label} (${point.action})`).join(" -> ")}`
         : payload.approachStrategy || "Manual route profile",
       timing: payload.timingConsiderations || "Manual timing window",
-      sensorPlan: payload.sensorTasking || "Video, public camera, audio, and satellite corroboration",
-      deconfliction: payload.commsPlan || "Analyst review required before operational use",
+      sensorPlan: collectionWindows.length
+        ? `${payload.sensorTasking || "Manual sensor tasking"}; windows: ${collectionWindows
+            .map((window) => `${window.source} T+${window.offsetMin}m`)
+            .join(", ")}`
+        : payload.sensorTasking || "Video, public camera, audio, and satellite corroboration",
+      deconfliction: setupItems.length
+        ? `${payload.commsPlan || "Manual deconfliction"}; setup posture ${setupItems.filter((item) => item.status === "ready").length}/${setupItems.length} ready`
+        : payload.commsPlan || "Analyst review required before operational use",
       weatherAssumption: payload.environmentalNotes || "Weather assumptions not specified"
     }
   };

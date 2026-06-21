@@ -6,6 +6,8 @@ export type Coordinates = {
 };
 
 export type TrajectoryAction = "launch" | "transit" | "hold" | "observe" | "effect" | "egress" | "recovery";
+export type TrajectorySensorMode = "none" | "rgb-video" | "thermal-video" | "audio" | "satellite-cue" | "public-camera";
+export type SetupStatus = "ready" | "pending" | "blocked";
 
 export type ManualTrajectoryPoint = {
   id: string;
@@ -16,7 +18,28 @@ export type ManualTrajectoryPoint = {
   speedKmh: number;
   etaOffsetMin: number;
   action: TrajectoryAction;
+  headingDeg: number;
+  holdSeconds: number;
+  sensorMode: TrajectorySensorMode;
+  handoff: string;
   notes: string;
+};
+
+export type ManualSetupItem = {
+  id: string;
+  label: string;
+  owner: string;
+  status: SetupStatus;
+  notes: string;
+};
+
+export type ManualCollectionWindow = {
+  id: string;
+  label: string;
+  source: "video" | "camera" | "audio" | "satellite" | "operator" | "other";
+  offsetMin: number;
+  durationMin: number;
+  objective: string;
 };
 
 export type StrikeRecommendation = {
@@ -69,6 +92,8 @@ export type ManualPlanInput = {
   additionalContext: string;
   operatorName: string;
   trajectory: ManualTrajectoryPoint[];
+  setupItems: ManualSetupItem[];
+  collectionWindows: ManualCollectionWindow[];
   assetPackage: string;
   sensorTasking: string;
   commsPlan: string;

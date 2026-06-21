@@ -99,7 +99,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
   }
 
   return (
-    <div className="pipeline-panel">
+    <div className="panel pipeline-card pipeline-panel analysis-panel">
       <div className="panel-header">
         <div>
           <span className="panel-kicker">Stage 3</span>
@@ -394,11 +394,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
       <style jsx>{`
         .pipeline-panel {
           background:
-            linear-gradient(rgba(117, 240, 200, 0.025) 50%, transparent 50%),
-            linear-gradient(180deg, rgba(16, 21, 18, 0.82), rgba(5, 7, 6, 0.72));
-          background-size: 100% 4px, auto;
-          border: 1px solid rgba(117, 240, 200, 0.16);
-          border-radius: 8px;
+            linear-gradient(135deg, rgba(117, 240, 200, 0.06), transparent 34%),
+            var(--panel);
+          border: 1px solid var(--line);
+          border-radius: 0;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.018), 0 18px 44px rgba(0, 0, 0, 0.22);
           overflow: hidden;
         }
 
@@ -1076,7 +1076,7 @@ function buildTimeline(recommendation: StrikeRecommendation, postStrikeData: Pos
     recommendation.trajectory?.map((point) => ({
       time: `T+${point.etaOffsetMin}m`,
       label: point.label,
-      detail: `${titleCase(point.action)} checkpoint at ${Math.round(point.altitudeM)} m / ${Math.round(point.speedKmh)} km/h`
+      detail: `${titleCase(point.action)} checkpoint at ${Math.round(point.altitudeM)} m / ${Math.round(point.speedKmh)} km/h; ${point.sensorMode} sensor; handoff ${point.handoff || "not assigned"}`
     })) ?? [];
 
   const evidenceItems = postStrikeData.timeline.map((item) => ({
