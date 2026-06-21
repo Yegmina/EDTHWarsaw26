@@ -196,7 +196,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                   <div className="timeline-item">
                     <div className="timeline-marker complete" />
                     <div>
-                      options<strong>T+15min</strong>
+                      <strong>T+15min</strong>
                       <p>Satellite tasking complete - BDA initiated</p>
                     </div>
                   </div>
@@ -264,7 +264,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                   <div className="comparison-grid">
                     <div className="comparison-item">
                       <span>Predicted</span>
-                      options<strong>78% confidence</strong>
+                      <strong>78% confidence</strong>
                     </div>
                     <div className="comparison-item">
                       <span>Actual</span>

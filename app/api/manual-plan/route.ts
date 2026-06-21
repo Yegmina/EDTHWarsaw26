@@ -1,7 +1,7 @@
 // app/api/manual-plan/route.ts
 
 import { NextResponse } from "next/server";
-import type { ManualPlanInput, AgentAnalyzedPlan } from "@/app/types/pipeline";
+import type { ManualPlanInput, AgentAnalyzedPlan, RiskLevel, StrikeRecommendation } from "@/app/types/pipeline";
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -67,14 +67,15 @@ export async function POST(request: Request) {
         originalPlan: payload,
         agentAnalysis: {
           feasibilityScore: llmAnalysis.feasibilityScore || 70,
-          riskAssessment: llmAnalysis.riskAssessment || "medium",
+          riskAssessment: normalizeRisk(llmAnalysis.riskAssessment),
           strengths: llmAnalysis.strengths || ["Manual plan submitted for review"],
           weaknesses: llmAnalysis.weaknesses || ["Requires further analysis"],
           recommendedModifications: llmAnalysis.recommendedModifications || [],
           alternativeApproaches: llmAnalysis.alternativeApproaches || [],
           confidenceLevel: llmAnalysis.confidenceLevel || 75,
           analysisTimestamp: new Date().toISOString()
-        }
+        },
+        integratedRecommendation: recommendationFromManualPlan(payload, llmAnalysis.confidenceLevel || 75, normalizeRisk(llmAnalysis.riskAssessment))
       };
 
       return NextResponse.json(analyzedPlan);
@@ -108,7 +109,8 @@ export async function POST(request: Request) {
         ],
         confidenceLevel: 68,
         analysisTimestamp: new Date().toISOString()
-      }
+      },
+      integratedRecommendation: recommendationFromManualPlan(payload, 68, "medium")
     };
 
     return NextResponse.json(analyzedPlan);
@@ -118,6 +120,51 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+function normalizeRisk(value: unknown): RiskLevel {
+  return value === "low" || value === "medium" || value === "high" || value === "critical" ? value : "medium";
+}
+
+function recommendationFromManualPlan(
+  payload: ManualPlanInput,
+  confidenceScore: number,
+  riskLevel: RiskLevel
+): StrikeRecommendation {
+  return {
+    id: `manual-rec-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    source: "manual-agent",
+    targetSummary: payload.targetDescription,
+    coordinates: payload.coordinates,
+    recommendedWindow: payload.timingConsiderations || "Operator-defined review window",
+    approachCorridor: payload.approachStrategy || "Operator-defined approach corridor",
+    standoffDistanceKm: riskLevel === "critical" ? 120 : riskLevel === "high" ? 90 : 65,
+    riskLevel,
+    confidenceScore: Math.max(0, Math.min(100, Math.round(Number(confidenceScore) || 68))),
+    rationale: [
+      "Manual plan accepted and converted into pipeline parameters.",
+      "Agent review produced a bounded confidence score and risk category.",
+      "Stage 2 should collect independent post-event evidence before conclusions."
+    ],
+    constraints: [
+      payload.adAvoidanceStrategy || "Defensive coverage notes require review.",
+      payload.environmentalNotes || "Environmental assumptions require update before assessment.",
+      payload.additionalContext || "Additional source context not provided."
+    ],
+    intelligenceGaps: [
+      "Manual plan source metadata requires review.",
+      "Independent imagery and sensor confirmation are required.",
+      "Any conflicting reports should be retained for Stage 3 analysis."
+    ],
+    selectedParameters: {
+      routeProfile: payload.approachStrategy || "Manual route profile",
+      timing: payload.timingConsiderations || "Manual timing window",
+      sensorPlan: "Video, public camera, audio, and satellite corroboration",
+      deconfliction: "Analyst review required before operational use",
+      weatherAssumption: payload.environmentalNotes || "Weather assumptions not specified"
+    }
+  };
 }
 
 // Helper functions
