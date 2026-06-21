@@ -3,20 +3,24 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
   Brain,
   Crosshair,
   Database,
+  Download,
   FileSearch,
   Globe2,
   Image as ImageIcon,
+  Import,
   Layers,
   Loader2,
   Radar,
+  RotateCcw,
   Ruler,
+  Save,
   ShieldCheck,
   Sparkles,
   TrendingUp
@@ -79,6 +83,28 @@ type RangeRing = {
 
 type PipelineStage = "stage-0" | "stage-1" | "stage-2" | "stage-3";
 
+type PipelineSessionSnapshot = {
+  version: 1;
+  savedAt: string;
+  rawText: string;
+  sourceTitle: string;
+  sourceUrl: string;
+  imageUrl: string;
+  analysis: AnalysisResult;
+  rangeAnchor: { lat: number; lng: number };
+  rangeKm: number;
+  rangeLabel: string;
+  rangeRings: RangeRing[];
+  lastAnalyzedText: string;
+  activeStage: PipelineStage;
+  strikeRecommendation: unknown;
+  postStrikeData: unknown;
+  manualPlanMode: boolean;
+  agentAnalysis: unknown;
+};
+
+const sessionStorageKey = "aerorozum-warsaw26-pipeline-session-v1";
+
 const sampleInput = `Source: private analyst note
 Claim: 5 Pantsir air-defense systems are positioned around the Red Square perimeter in Moscow.
 Time observed: not stated.
@@ -105,6 +131,10 @@ const emptyResult: AnalysisResult = {
 };
 
 export default function Home() {
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState("Session not loaded");
+
   // Stage 0 state
   const [rawText, setRawText] = useState("");
   const [sourceTitle, setSourceTitle] = useState("");
@@ -127,6 +157,77 @@ export default function Home() {
   // Manual plan state
   const [manualPlanMode, setManualPlanMode] = useState(false);
   const [agentAnalysis, setAgentAnalysis] = useState<any>(null);
+
+  const sessionSnapshot = useMemo<PipelineSessionSnapshot>(
+    () => ({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      rawText,
+      sourceTitle,
+      sourceUrl,
+      imageUrl,
+      analysis,
+      rangeAnchor,
+      rangeKm,
+      rangeLabel,
+      rangeRings,
+      lastAnalyzedText,
+      activeStage,
+      strikeRecommendation,
+      postStrikeData,
+      manualPlanMode,
+      agentAnalysis
+    }),
+    [
+      activeStage,
+      agentAnalysis,
+      analysis,
+      imageUrl,
+      lastAnalyzedText,
+      manualPlanMode,
+      postStrikeData,
+      rangeAnchor,
+      rangeKm,
+      rangeLabel,
+      rangeRings,
+      rawText,
+      sourceTitle,
+      sourceUrl,
+      strikeRecommendation
+    ]
+  );
+
+  useEffect(() => {
+    try {
+      const storedSession = window.localStorage.getItem(sessionStorageKey);
+      if (storedSession) {
+        const parsed = parseSessionSnapshot(storedSession);
+        applySessionSnapshot(parsed);
+        setSessionStatus(`Restored ${formatSessionTime(parsed.savedAt)}`);
+      } else {
+        setSessionStatus("New session");
+      }
+    } catch (err) {
+      setSessionStatus(err instanceof Error ? err.message : "Session restore failed");
+    } finally {
+      setSessionReady(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+
+    try {
+      const snapshot = JSON.stringify(sessionSnapshot);
+      window.localStorage.setItem(sessionStorageKey, snapshot);
+      setSessionStatus(`Autosaved ${formatSessionTime(sessionSnapshot.savedAt)}`);
+    } catch {
+      setSessionStatus("Autosave failed");
+    }
+  }, [sessionReady, sessionSnapshot]);
 
   const inputStats = useMemo(() => {
     const words = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
@@ -218,6 +319,87 @@ export default function Home() {
     }
   }
 
+  function applySessionSnapshot(snapshot: PipelineSessionSnapshot) {
+    setRawText(snapshot.rawText);
+    setSourceTitle(snapshot.sourceTitle);
+    setSourceUrl(snapshot.sourceUrl);
+    setImageUrl(snapshot.imageUrl);
+    setAnalysis(snapshot.analysis);
+    setRangeAnchor(snapshot.rangeAnchor);
+    setRangeKm(snapshot.rangeKm);
+    setRangeLabel(snapshot.rangeLabel);
+    setRangeRings(snapshot.rangeRings);
+    setLastAnalyzedText(snapshot.lastAnalyzedText);
+    setActiveStage(snapshot.activeStage);
+    setStrikeRecommendation(snapshot.strikeRecommendation);
+    setPostStrikeData(snapshot.postStrikeData);
+    setManualPlanMode(snapshot.manualPlanMode);
+    setAgentAnalysis(snapshot.agentAnalysis);
+    setError("");
+  }
+
+  function handlePersistNow() {
+    try {
+      const snapshot = { ...sessionSnapshot, savedAt: new Date().toISOString() };
+      window.localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot));
+      setSessionStatus(`Saved ${formatSessionTime(snapshot.savedAt)}`);
+    } catch {
+      setSessionStatus("Save failed");
+    }
+  }
+
+  function handleExportSession() {
+    const snapshot = { ...sessionSnapshot, savedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `aerorozum-session-${snapshot.savedAt.replace(/[:.]/g, "-")}.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setSessionStatus(`Exported ${formatSessionTime(snapshot.savedAt)}`);
+  }
+
+  async function handleImportSession(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    try {
+      const snapshot = parseSessionSnapshot(await file.text());
+      applySessionSnapshot(snapshot);
+      window.localStorage.setItem(sessionStorageKey, JSON.stringify(snapshot));
+      setSessionStatus(`Imported ${formatSessionTime(snapshot.savedAt)}`);
+    } catch (err) {
+      setSessionStatus(err instanceof Error ? err.message : "Import failed");
+    }
+  }
+
+  function handleResetSession() {
+    window.localStorage.removeItem(sessionStorageKey);
+    setRawText("");
+    setSourceTitle("");
+    setSourceUrl("");
+    setImageUrl("");
+    setAnalysis(emptyResult);
+    setRangeAnchor({ lat: 55.7558, lng: 37.6173 });
+    setRangeKm(120);
+    setRangeLabel("Custom range");
+    setRangeRings([]);
+    setLastAnalyzedText("");
+    setActiveStage("stage-0");
+    setStrikeRecommendation(null);
+    setPostStrikeData(null);
+    setManualPlanMode(false);
+    setAgentAnalysis(null);
+    setError("");
+    setSessionStatus("Session reset");
+  }
+
   return (
     <main className="app-shell">
       <section className="command-bar">
@@ -271,6 +453,35 @@ export default function Home() {
             <Globe2 size={16} />
             Multi-Source Intel
           </span>
+        </div>
+        <div className="session-strip">
+          <span>
+            <Save size={15} />
+            {sessionStatus}
+          </span>
+          <button type="button" onClick={handlePersistNow}>
+            <Save size={15} />
+            Save
+          </button>
+          <button type="button" onClick={handleExportSession}>
+            <Download size={15} />
+            Export
+          </button>
+          <button type="button" onClick={() => importInputRef.current?.click()}>
+            <Import size={15} />
+            Import
+          </button>
+          <button type="button" className="ghost-button" onClick={handleResetSession}>
+            <RotateCcw size={15} />
+            Reset
+          </button>
+          <input
+            accept="application/json,.json"
+            className="session-file-input"
+            onChange={handleImportSession}
+            ref={importInputRef}
+            type="file"
+          />
         </div>
       </section>
 
@@ -715,4 +926,162 @@ function compactText(value: string, maxLength: number) {
     return "No Stage 0 brief is available yet.";
   }
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
+}
+
+function parseSessionSnapshot(raw: string): PipelineSessionSnapshot {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed) || parsed.version !== 1) {
+    throw new Error("Unsupported session file");
+  }
+
+  return {
+    version: 1,
+    savedAt: stringValue(parsed.savedAt, new Date().toISOString()),
+    rawText: stringValue(parsed.rawText, ""),
+    sourceTitle: stringValue(parsed.sourceTitle, ""),
+    sourceUrl: stringValue(parsed.sourceUrl, ""),
+    imageUrl: stringValue(parsed.imageUrl, ""),
+    analysis: normalizeAnalysis(parsed.analysis),
+    rangeAnchor: normalizeCoordinatePair(parsed.rangeAnchor, { lat: 55.7558, lng: 37.6173 }),
+    rangeKm: numberValue(parsed.rangeKm, 120),
+    rangeLabel: stringValue(parsed.rangeLabel, "Custom range"),
+    rangeRings: normalizeRangeRings(parsed.rangeRings),
+    lastAnalyzedText: stringValue(parsed.lastAnalyzedText, ""),
+    activeStage: normalizeStage(parsed.activeStage),
+    strikeRecommendation: parsed.strikeRecommendation ?? null,
+    postStrikeData: parsed.postStrikeData ?? null,
+    manualPlanMode: Boolean(parsed.manualPlanMode),
+    agentAnalysis: parsed.agentAnalysis ?? null
+  };
+}
+
+function normalizeAnalysis(value: unknown): AnalysisResult {
+  if (!isRecord(value)) {
+    return emptyResult;
+  }
+
+  return {
+    brief: stringValue(value.brief, emptyResult.brief),
+    observations: Array.isArray(value.observations)
+      ? value.observations.map(normalizeObservation).filter((item): item is Observation => Boolean(item))
+      : emptyResult.observations,
+    confidence: stringValue(value.confidence, emptyResult.confidence),
+    sourceGaps: normalizeStringArray(value.sourceGaps, emptyResult.sourceGaps),
+    verificationQuestions: normalizeStringArray(value.verificationQuestions, emptyResult.verificationQuestions),
+    safetyFlags: normalizeStringArray(value.safetyFlags, []),
+    mapLayers: Array.isArray(value.mapLayers)
+      ? value.mapLayers.map(normalizeMapLayer).filter((item): item is MapLayer => Boolean(item))
+      : [],
+    evidenceCards: Array.isArray(value.evidenceCards)
+      ? value.evidenceCards.map(normalizeEvidenceCard).filter((item): item is EvidenceCard => Boolean(item))
+      : []
+  };
+}
+
+function normalizeObservation(value: unknown): Observation | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    label: stringValue(value.label, "Imported observation"),
+    detail: stringValue(value.detail, "No detail supplied."),
+    confidence: stringValue(value.confidence, "medium"),
+    source: stringValue(value.source, "import")
+  };
+}
+
+function normalizeMapLayer(value: unknown): MapLayer | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    id: stringValue(value.id, `layer-${Date.now()}`),
+    label: stringValue(value.label, "Imported layer"),
+    lat: numberValue(value.lat, 55.7558),
+    lng: numberValue(value.lng, 37.6173),
+    radiusMeters: numberValue(value.radiusMeters, 25000),
+    confidence: stringValue(value.confidence, "medium"),
+    category: stringValue(value.category, "imported"),
+    detail: stringValue(value.detail, "Imported session layer.")
+  };
+}
+
+function normalizeEvidenceCard(value: unknown): EvidenceCard | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    title: stringValue(value.title, "Imported source"),
+    description: stringValue(value.description, "Imported source context."),
+    url: stringValue(value.url, "#"),
+    imageUrl: typeof value.imageUrl === "string" ? value.imageUrl : undefined,
+    source: stringValue(value.source, "import")
+  };
+}
+
+function normalizeRangeRings(value: unknown): RangeRing[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      return {
+        id: stringValue(item.id, `range-${Date.now()}`),
+        label: stringValue(item.label, "Imported range"),
+        lat: numberValue(item.lat, 55.7558),
+        lng: numberValue(item.lng, 37.6173),
+        radiusMeters: numberValue(item.radiusMeters, 120000)
+      };
+    })
+    .filter((item): item is RangeRing => Boolean(item));
+}
+
+function normalizeCoordinatePair(value: unknown, fallback: { lat: number; lng: number }) {
+  if (!isRecord(value)) {
+    return fallback;
+  }
+
+  return {
+    lat: numberValue(value.lat, fallback.lat),
+    lng: numberValue(value.lng, fallback.lng)
+  };
+}
+
+function normalizeStringArray(value: unknown, fallback: string[]) {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : fallback;
+}
+
+function normalizeStage(value: unknown): PipelineStage {
+  return value === "stage-0" || value === "stage-1" || value === "stage-2" || value === "stage-3"
+    ? value
+    : "stage-0";
+}
+
+function formatSessionTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "now";
+  }
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function numberValue(value: unknown, fallback: number) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

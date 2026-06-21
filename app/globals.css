@@ -86,14 +86,24 @@ h1 {
   gap: 8px;
 }
 
+.session-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
 .status-strip span,
+.session-strip span,
 .telemetry,
 .map-overlay,
 .confidence {
   font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.status-strip span {
+.status-strip span,
+.session-strip span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -102,6 +112,29 @@ h1 {
   color: var(--muted);
   padding: 9px 11px;
   font-size: 0.78rem;
+}
+
+.session-strip button {
+  min-height: 36px;
+  border-radius: 8px;
+  background: rgba(117, 240, 200, 0.1);
+  color: var(--green);
+  padding: 0 11px;
+  font-size: 0.78rem;
+}
+
+.session-strip button:hover {
+  background: rgba(117, 240, 200, 0.16);
+}
+
+.session-strip .ghost-button {
+  background: rgba(240, 113, 103, 0.08);
+  border-color: rgba(240, 113, 103, 0.24);
+  color: var(--red);
+}
+
+.session-file-input {
+  display: none;
 }
 
 .dashboard-grid {
@@ -1241,6 +1274,10 @@ ul {
   }
 
   .status-strip {
+    justify-content: flex-start;
+  }
+
+  .session-strip {
     justify-content: flex-start;
   }
 
