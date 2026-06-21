@@ -4,58 +4,99 @@
 
 import { useMemo, useState } from "react";
 import {
-  BarChart3,
-  TrendingUp,
-  Target,
-  Shield,
-  AlertTriangle,
-  CheckCircle2,
-  Lightbulb,
-  ArrowUpRight,
-  Gauge,
   Activity,
-  Zap,
-  FileText
+  AlertTriangle,
+  ArrowUpRight,
+  BarChart3,
+  CheckCircle2,
+  ClipboardList,
+  Database,
+  Download,
+  FileText,
+  Gauge,
+  Lightbulb,
+  Shield,
+  Target,
+  TrendingUp,
+  Zap
 } from "lucide-react";
-import type { StrikeRecommendation, PostStrikeData, AnalysisConclusion } from "@/app/types/pipeline";
+import type { AnalysisConclusion, PostStrikeData, StrikeRecommendation } from "@/app/types/pipeline";
 
 type AnalysisDashboardProps = {
   recommendation: StrikeRecommendation;
   postStrikeData: PostStrikeData;
 };
 
-export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDashboardProps) {
-  const [activeView, setActiveView] = useState<"summary" | "effectiveness" | "lessons" | "parameters">("summary");
+type DashboardView = "summary" | "effectiveness" | "lessons" | "parameters" | "audit";
 
-  const conclusions: AnalysisConclusion = useMemo(() => ({
-    id: `conclusion-${recommendation.id}-${postStrikeData.id}`,
-    recommendationId: recommendation.id,
-    postStrikeId: postStrikeData.id,
-    summary: "Strike parameters demonstrated effective target engagement with minimal collateral effects. Northern approach corridor validated as optimal ingress route. Multi-source intelligence confirmed primary target destruction with 92% confidence. Environmental factors aligned favorably with pre-strike assessment.",
-    effectiveness: {
-      rating: "effective",
-      factors: [
-        "Target destroyed within expected timeframe",
-        "Secondary effects limited to 300m radius as predicted",
-        "Communications disruption within expected parameters",
-        "Approach path avoided 4 of 5 known air defense systems"
-      ]
-    },
-    lessonsLearned: [
-      "Northern approach corridor performance exceeded expectations - recommend as primary route for similar targets",
-      "Cloud cover assisted concealment but slightly degraded precision - adjust weather minimums by 5%",
-      "Secondary explosion pattern suggests ammunition storage not identified in pre-strike intelligence",
-      "Civilian camera infrastructure provided valuable real-time BDA - incorporate more sources in future"
-    ],
-    parameterAdjustments: [
-      "Adjust weather minimum ceiling to 2000m for precision-guided systems",
-      "Expand pre-strike intelligence to include potential ammunition/fuel storage",
-      "Incorporate additional civilian camera feeds within 5km radius",
-      "Optimize acoustic sensor network for faster secondary explosion detection"
-    ],
-    confidenceScore: 88,
-    timestamp: new Date().toISOString()
-  }), [recommendation.id, postStrikeData.id]);
+type KeyMetric = {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "success" | "warning" | "info";
+  icon: "check" | "shield" | "chart" | "trend";
+};
+
+type Objective = {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "success" | "warning";
+};
+
+type TimelineItem = {
+  time: string;
+  label: string;
+  detail: string;
+};
+
+type SourceStatus = PostStrikeData["sourceReports"][number]["status"];
+
+const statusLabels: Record<PostStrikeData["status"], string> = {
+  destroyed: "destroyed",
+  "partially-damaged": "partially damaged",
+  active: "active",
+  unknown: "unknown"
+};
+
+const statusOutcome: Record<PostStrikeData["status"], string> = {
+  destroyed: "Target effects confirmed",
+  "partially-damaged": "Partial effects confirmed",
+  active: "Target still active",
+  unknown: "Outcome unresolved"
+};
+
+const statusDetail: Record<PostStrikeData["status"], string> = {
+  destroyed: "Primary effects are supported by available post-event sources.",
+  "partially-damaged": "Post-event sources indicate degradation, but not full confirmation.",
+  active: "Submitted sources do not support a completed effect.",
+  unknown: "Submitted sources are not strong enough to support a firm conclusion."
+};
+
+const reportStatusRank: Record<SourceStatus, number> = {
+  confirmed: 4,
+  supporting: 3,
+  pending: 2,
+  conflicting: 1
+};
+
+export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDashboardProps) {
+  const [activeView, setActiveView] = useState<DashboardView>("summary");
+
+  const report = useMemo(() => buildDashboardReport(recommendation, postStrikeData), [recommendation, postStrikeData]);
+  const { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload } = report;
+
+  function handleDownloadReport() {
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `analysis-report-${postStrikeData.id}.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="pipeline-panel">
@@ -77,6 +118,10 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
               {conclusions.effectiveness.rating.replace("-", " ").toUpperCase()}
             </strong>
           </div>
+          <button className="download-report" onClick={handleDownloadReport} type="button">
+            <Download size={14} />
+            Export
+          </button>
         </div>
       </div>
 
@@ -110,6 +155,13 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
             <Zap size={16} />
             Parameter Adjustments
           </button>
+          <button
+            className={`nav-item ${activeView === "audit" ? "nav-active" : ""}`}
+            onClick={() => setActiveView("audit")}
+          >
+            <ClipboardList size={16} />
+            Evidence Audit
+          </button>
         </div>
 
         <div className="dashboard-content">
@@ -124,89 +176,35 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
               </div>
 
               <div className="key-metrics-grid">
-                <div className="key-metric">
-                  <div className="metric-icon success">
-                    <CheckCircle2 size={24} />
+                {keyMetrics.map((metric) => (
+                  <div className="key-metric" key={metric.label}>
+                    <div className={`metric-icon ${metric.tone}`}>
+                      {metric.icon === "check" && <CheckCircle2 size={24} />}
+                      {metric.icon === "shield" && <Shield size={24} />}
+                      {metric.icon === "chart" && <BarChart3 size={24} />}
+                      {metric.icon === "trend" && <TrendingUp size={24} />}
+                    </div>
+                    <div className="metric-content">
+                      <span>{metric.label}</span>
+                      <strong>{metric.value}</strong>
+                      <p>{metric.detail}</p>
+                    </div>
                   </div>
-                  <div className="metric-content">
-                    <span>Mission Success</span>
-                    <strong>Primary Target Destroyed</strong>
-                    <p>Confirmed via 3 independent intelligence sources</p>
-                  </div>
-                </div>
-
-                <div className="key-metric">
-                  <div className="metric-icon warning">
-                    <Shield size={24} />
-                  </div>
-                  <div className="metric-content">
-                    <span>AD Systems Avoided</span>
-                    <strong>4 of 5 Systems</strong>
-                    <p>Northern corridor validated as optimal route</p>
-                  </div>
-                </div>
-
-                <div className="key-metric">
-                  <div className="metric-icon info">
-                    <BarChart3 size={24} />
-                  </div>
-                  <div className="metric-content">
-                    <span>Intel Accuracy</span>
-                    <strong>88% Correlation</strong>
-                    <p>Pre-strike assessment matched post-strike reality</p>
-                  </div>
-                </div>
-
-                <div className="key-metric">
-                  <div className="metric-icon success">
-                    <TrendingUp size={24} />
-                  </div>
-                  <div className="metric-content">
-                    <span>BDA Confidence</span>
-                    <strong>92% Confidence</strong>
-                    <p>Multi-source fusion achieved high reliability</p>
-                  </div>
-                </div>
+                ))}
               </div>
 
               <div className="timeline-summary">
-                <h4>Engagement Timeline</h4>
+                <h4>Assessment Timeline</h4>
                 <div className="timeline">
-                  <div className="timeline-item">
-                    <div className="timeline-marker complete" />
-                    <div>
-                      <strong>T-60min</strong>
-                      <p>Strike parameters confirmed</p>
+                  {timeline.map((item, index) => (
+                    <div className="timeline-item" key={`${item.time}-${item.label}-${index}`}>
+                      <div className="timeline-marker complete" />
+                      <div>
+                        <strong>{item.time}</strong>
+                        <p>{item.label} - {item.detail}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="timeline-item">
-                    <div className="timeline-marker complete" />
-                    <div>
-                      <strong>T+0s</strong>
-                      <p>Target engagement confirmed - seismic detection</p>
-                    </div>
-                  </div>
-                  <div className="timeline-item">
-                    <div className="timeline-marker complete" />
-                    <div>
-                      <strong>T+47s</strong>
-                      <p>Secondary explosions detected - acoustic network</p>
-                    </div>
-                  </div>
-                  <div className="timeline-item">
-                    <div className="timeline-marker complete" />
-                    <div>
-                      <strong>T+15min</strong>
-                      <p>Satellite tasking complete - BDA initiated</p>
-                    </div>
-                  </div>
-                  <div className="timeline-item">
-                    <div className="timeline-marker complete" />
-                    <div>
-                      <strong>T+1hr</strong>
-                      <p>Multi-source fusion analysis complete</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -223,35 +221,23 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                 <div className="effectiveness-card">
                   <h4>Primary Objectives</h4>
                   <div className="objective-list">
-                    <div className="objective-item success">
-                      <CheckCircle2 size={16} />
-                      <div>
-                        <strong>Target Neutralization</strong>
-                        <span>Primary target destroyed - 92% confidence</span>
+                    {objectives.map((objective) => (
+                      <div className={`objective-item ${objective.tone}`} key={objective.label}>
+                        {objective.tone === "success" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                        <div>
+                          <strong>{objective.label}</strong>
+                          <span>{objective.value} - {objective.detail}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="objective-item success">
-                      <CheckCircle2 size={16} />
-                      <div>
-                        <strong>Collateral Limitation</strong>
-                        <span>Damage contained within 300m radius</span>
-                      </div>
-                    </div>
-                    <div className="objective-item warning">
-                      <AlertTriangle size={16} />
-                      <div>
-                        <strong>Intelligence Completeness</strong>
-                        <span>Ammunition storage not identified pre-strike</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
                 <div className="effectiveness-card">
                   <h4>Effectiveness Factors</h4>
                   <ul className="factors-list">
-                    {conclusions.effectiveness.factors.map((factor, i) => (
-                      <li key={i}>
+                    {conclusions.effectiveness.factors.map((factor) => (
+                      <li key={factor}>
                         <ArrowUpRight size={14} />
                         {factor}
                       </li>
@@ -260,19 +246,21 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                 </div>
 
                 <div className="effectiveness-card">
-                  <h4>Recommendation vs Reality</h4>
+                  <h4>Recommendation vs Evidence</h4>
                   <div className="comparison-grid">
                     <div className="comparison-item">
-                      <span>Predicted</span>
-                      <strong>78% confidence</strong>
+                      <span>Plan</span>
+                      <strong>{recommendation.confidenceScore}% confidence</strong>
                     </div>
                     <div className="comparison-item">
-                      <span>Actual</span>
-                      <strong>92% confidence</strong>
+                      <span>Evidence</span>
+                      <strong>{postStrikeData.confidenceScore}% confidence</strong>
                     </div>
                     <div className="comparison-item">
                       <span>Delta</span>
-                      <strong className="text-emerald">+14%</strong>
+                      <strong className={evidenceScore.delta >= 0 ? "text-emerald" : "text-amber"}>
+                        {evidenceScore.delta >= 0 ? "+" : ""}{evidenceScore.delta}%
+                      </strong>
                     </div>
                   </div>
                 </div>
@@ -286,18 +274,15 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                 <Lightbulb size={20} />
                 Lessons Learned
               </h3>
-              
+
               <div className="lessons-grid">
-                {conclusions.lessonsLearned.map((lesson, i) => (
-                  <div key={i} className="lesson-card">
-                    <div className="lesson-number">{String(i + 1).padStart(2, "0")}</div>
+                {conclusions.lessonsLearned.map((lesson, index) => (
+                  <div className="lesson-card" key={lesson}>
+                    <div className="lesson-number">{String(index + 1).padStart(2, "0")}</div>
                     <div className="lesson-content">
                       <p>{lesson}</p>
                       <div className="lesson-tags">
-                        {i === 0 && <span className="tag tactical">TACTICAL</span>}
-                        {i === 1 && <span className="tag environmental">ENVIRONMENTAL</span>}
-                        {i === 2 && <span className="tag intelligence">INTELLIGENCE</span>}
-                        {i === 3 && <span className="tag technical">TECHNICAL</span>}
+                        <span className={`tag ${lessonTagClass(index)}`}>{lessonTagLabel(index)}</span>
                       </div>
                     </div>
                   </div>
@@ -312,31 +297,94 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
                 <Zap size={20} />
                 Recommended Parameter Adjustments
               </h3>
-              
+
               <div className="parameters-list">
-                {conclusions.parameterAdjustments.map((adjustment, i) => (
-                  <div key={i} className="parameter-card">
+                {conclusions.parameterAdjustments.map((adjustment, index) => (
+                  <div className="parameter-card" key={adjustment}>
                     <div className="parameter-header">
                       <div className="parameter-icon">
                         <ArrowUpRight size={20} />
                       </div>
-                      <div className="parameter-priority">
-                        {i === 0 ? "HIGH PRIORITY" : i === 1 ? "MEDIUM PRIORITY" : "LOW PRIORITY"}
-                      </div>
+                      <div className="parameter-priority">{priorityLabel(index)}</div>
                     </div>
                     <p className="parameter-text">{adjustment}</p>
                     <div className="parameter-impact">
                       <span>Expected Impact:</span>
                       <div className="impact-bar">
-                        <div 
-                          className="impact-fill" 
-                          style={{ width: `${[85, 70, 60, 45][i]}%` }}
-                        />
+                        <div className="impact-fill" style={{ width: `${impactValue(index)}%` }} />
                       </div>
-                      <strong>{[85, 70, 60, 45][i]}%</strong>
+                      <strong>{impactValue(index)}%</strong>
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeView === "audit" && (
+            <div className="audit-view">
+              <h3>
+                <ClipboardList size={20} />
+                Evidence Audit
+              </h3>
+
+              <div className="audit-grid">
+                <div className="audit-card">
+                  <h4>Source Status</h4>
+                  <div className="status-counts">
+                    {Object.entries(statusCounts).map(([status, count]) => (
+                      <div className="status-count" key={status}>
+                        <span>{status}</span>
+                        <strong>{count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="audit-card">
+                  <h4>Decision Basis</h4>
+                  <p>{statusOutcome[postStrikeData.status]}</p>
+                  <p>{statusDetail[postStrikeData.status]}</p>
+                </div>
+              </div>
+
+              <div className="source-report-list">
+                {postStrikeData.sourceReports
+                  .slice()
+                  .sort((a, b) => reportStatusRank[b.status] - reportStatusRank[a.status])
+                  .map((reportItem) => (
+                    <article className="source-report-card" key={reportItem.id}>
+                      <div>
+                        <Database size={16} />
+                        <strong>{reportItem.label}</strong>
+                        <span>{reportItem.type}</span>
+                      </div>
+                      <p>{reportItem.summary}</p>
+                      <div className="source-report-footer">
+                        <span>{reportItem.status}</span>
+                        <strong>{reportItem.confidence}%</strong>
+                      </div>
+                    </article>
+                  ))}
+              </div>
+
+              <div className="audit-grid">
+                <div className="audit-card">
+                  <h4>Open Gaps</h4>
+                  <ul>
+                    {postStrikeData.gaps.map((gap) => (
+                      <li key={gap}>{gap}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="audit-card">
+                  <h4>Next Review Actions</h4>
+                  <ul>
+                    {postStrikeData.nextReviewActions.map((action) => (
+                      <li key={action}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           )}
@@ -360,6 +408,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           justify-content: space-between;
           align-items: center;
+          gap: 1rem;
         }
 
         .panel-kicker {
@@ -378,10 +427,13 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .header-metrics {
           display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
           gap: 0.75rem;
         }
 
-        .metric-badge {
+        .metric-badge,
+        .download-report {
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -393,6 +445,16 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           font-size: 0.8rem;
         }
 
+        .download-report {
+          color: #75f0c8;
+          cursor: pointer;
+          font-weight: 800;
+        }
+
+        .download-report:hover {
+          background: rgba(117, 240, 200, 0.1);
+        }
+
         .metric-badge strong {
           color: #75f0c8;
           font-size: 1.1rem;
@@ -400,6 +462,10 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .text-emerald {
           color: #75f0c8 !important;
+        }
+
+        .text-amber {
+          color: #f6ad55 !important;
         }
 
         .dashboard-layout {
@@ -452,7 +518,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           margin-bottom: 2rem;
         }
 
-        .executive-summary h3 {
+        .executive-summary h3,
+        .effectiveness-view h3,
+        .lessons-view h3,
+        .parameters-view h3,
+        .audit-view h3 {
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -473,13 +543,21 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           margin-bottom: 2rem;
         }
 
+        .key-metric,
+        .effectiveness-card,
+        .lesson-card,
+        .parameter-card,
+        .audit-card,
+        .source-report-card {
+          background: rgba(5, 7, 6, 0.42);
+          border: 1px solid rgba(117, 240, 200, 0.12);
+          border-radius: 8px;
+        }
+
         .key-metric {
           display: flex;
           gap: 1rem;
           padding: 1rem;
-          background: rgba(5, 7, 6, 0.42);
-          border: 1px solid rgba(117, 240, 200, 0.12);
-          border-radius: 8px;
         }
 
         .metric-icon {
@@ -507,14 +585,21 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           color: #75f0c8;
         }
 
-        .metric-content span {
+        .metric-content span,
+        .comparison-item span,
+        .parameter-impact span,
+        .status-count span,
+        .source-report-card span {
           font-size: 0.7rem;
           color: #6f8378;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
 
-        .metric-content strong {
+        .metric-content strong,
+        .comparison-item strong,
+        .parameter-impact strong,
+        .status-count strong {
           display: block;
           color: #f4f6ef;
           font-size: 1.1rem;
@@ -527,7 +612,9 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           margin: 0;
         }
 
-        .timeline-summary h4 {
+        .timeline-summary h4,
+        .effectiveness-card h4,
+        .audit-card h4 {
           color: #f4f6ef;
           margin-bottom: 1rem;
         }
@@ -563,37 +650,31 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           font-size: 0.85rem;
         }
 
-        .timeline-item p {
+        .timeline-item p,
+        .objective-item span,
+        .factors-list li,
+        .lesson-content p,
+        .parameter-text,
+        .audit-card p,
+        .audit-card li,
+        .source-report-card p {
           color: #9bad9f;
-          font-size: 0.8rem;
-          margin: 0.15rem 0 0 0;
+          font-size: 0.85rem;
+          line-height: 1.5;
         }
 
-        .effectiveness-view h3,
-        .lessons-view h3,
-        .parameters-view h3 {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          color: #f4f6ef;
-          margin-bottom: 1.25rem;
-        }
-
-        .effectiveness-grid {
+        .effectiveness-grid,
+        .parameters-list,
+        .lessons-grid,
+        .source-report-list {
           display: grid;
           gap: 1rem;
         }
 
-        .effectiveness-card {
+        .effectiveness-card,
+        .parameter-card,
+        .source-report-card {
           padding: 1.25rem;
-          background: rgba(5, 7, 6, 0.42);
-          border: 1px solid rgba(117, 240, 200, 0.12);
-          border-radius: 8px;
-        }
-
-        .effectiveness-card h4 {
-          color: #f4f6ef;
-          margin-bottom: 1rem;
         }
 
         .objective-list {
@@ -622,71 +703,61 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           font-size: 0.85rem;
         }
 
-        .objective-item span {
-          color: #9bad9f;
-          font-size: 0.8rem;
-        }
-
-        .factors-list {
+        .factors-list,
+        .audit-card ul {
           list-style: none;
           padding: 0;
           margin: 0;
         }
 
-        .factors-list li {
+        .factors-list li,
+        .audit-card li {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 0.5rem;
           padding: 0.35rem 0;
-          color: #9bad9f;
-          font-size: 0.85rem;
         }
 
         .factors-list svg {
           color: #75f0c8;
+          flex-shrink: 0;
         }
 
-        .comparison-grid {
+        .audit-card li::before {
+          content: "";
+          width: 6px;
+          height: 6px;
+          flex: 0 0 auto;
+          margin-top: 0.45rem;
+          border-radius: 999px;
+          background: #75f0c8;
+        }
+
+        .comparison-grid,
+        .audit-grid,
+        .status-counts {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 0.75rem;
         }
 
-        .comparison-item {
+        .audit-grid {
+          grid-template-columns: repeat(2, 1fr);
+          margin-bottom: 1rem;
+        }
+
+        .comparison-item,
+        .status-count {
           text-align: center;
           padding: 0.75rem;
           background: rgba(5, 7, 6, 0.42);
           border-radius: 8px;
         }
 
-        .comparison-item span {
-          display: block;
-          font-size: 0.7rem;
-          color: #6f8378;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .comparison-item strong {
-          display: block;
-          color: #f4f6ef;
-          font-size: 1.1rem;
-          margin-top: 0.25rem;
-        }
-
-        .lessons-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
         .lesson-card {
           display: flex;
           gap: 1rem;
           padding: 1rem;
-          background: rgba(5, 7, 6, 0.42);
-          border: 1px solid rgba(117, 240, 200, 0.12);
-          border-radius: 8px;
         }
 
         .lesson-number {
@@ -698,8 +769,6 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .lesson-content p {
-          color: #9bad9f;
-          font-size: 0.85rem;
           margin: 0 0 0.5rem 0;
         }
 
@@ -740,19 +809,6 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           border: 1px solid rgba(117, 240, 200, 0.24);
         }
 
-        .parameters-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
-        .parameter-card {
-          padding: 1.25rem;
-          background: rgba(5, 7, 6, 0.42);
-          border: 1px solid rgba(117, 240, 200, 0.12);
-          border-radius: 8px;
-        }
-
         .parameter-header {
           display: flex;
           justify-content: space-between;
@@ -779,8 +835,6 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .parameter-text {
-          color: #9bad9f;
-          font-size: 0.9rem;
           margin: 0 0 1rem 0;
         }
 
@@ -788,11 +842,6 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           align-items: center;
           gap: 0.75rem;
-        }
-
-        .parameter-impact span {
-          color: #6f8378;
-          font-size: 0.8rem;
         }
 
         .impact-bar {
@@ -810,11 +859,289 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           transition: width 0.5s ease;
         }
 
-        .parameter-impact strong {
+        .audit-card {
+          padding: 1rem;
+        }
+
+        .source-report-card > div:first-child,
+        .source-report-footer {
+          display: flex;
+          align-items: center;
+          gap: 0.55rem;
+        }
+
+        .source-report-card > div:first-child {
+          margin-bottom: 0.75rem;
+        }
+
+        .source-report-card > div:first-child svg {
+          color: #75f0c8;
+        }
+
+        .source-report-card strong {
           color: #f4f6ef;
-          font-size: 1.1rem;
+        }
+
+        .source-report-card p {
+          margin: 0 0 0.9rem;
+        }
+
+        .source-report-footer {
+          justify-content: space-between;
+          border-top: 1px solid rgba(117, 240, 200, 0.1);
+          padding-top: 0.75rem;
+        }
+
+        .source-report-footer span {
+          color: #75f0c8;
+        }
+
+        @media (max-width: 900px) {
+          .panel-header {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .header-metrics {
+            justify-content: flex-start;
+          }
+
+          .dashboard-layout,
+          .key-metrics-grid,
+          .comparison-grid,
+          .audit-grid,
+          .status-counts {
+            grid-template-columns: 1fr;
+          }
+
+          .dashboard-nav {
+            border-right: 0;
+            border-bottom: 1px solid rgba(117, 240, 200, 0.14);
+          }
         }
       `}</style>
     </div>
   );
+}
+
+function buildDashboardReport(recommendation: StrikeRecommendation, postStrikeData: PostStrikeData) {
+  const statusCounts = countSourceStatuses(postStrikeData);
+  const evidenceScore = {
+    delta: postStrikeData.confidenceScore - recommendation.confidenceScore,
+    blended: Math.round(recommendation.confidenceScore * 0.35 + postStrikeData.confidenceScore * 0.65)
+  };
+
+  const rating = effectivenessRating(postStrikeData.status, postStrikeData.confidenceScore);
+  const statusLabel = statusLabels[postStrikeData.status];
+  const sourceSummary = `${statusCounts.confirmed} confirmed, ${statusCounts.supporting} supporting, ${statusCounts.pending} pending`;
+  const trajectoryCount = recommendation.trajectory?.length ?? 0;
+
+  const conclusions: AnalysisConclusion = {
+    id: `conclusion-${recommendation.id}-${postStrikeData.id}`,
+    recommendationId: recommendation.id,
+    postStrikeId: postStrikeData.id,
+    summary: [
+      `${recommendation.targetSummary} is currently assessed as ${statusLabel} with ${postStrikeData.confidenceScore}% evidence confidence.`,
+      `The final confidence is ${evidenceScore.blended}% after weighting the ${recommendation.confidenceScore}% planning confidence against the post-event source package.`,
+      `Source posture: ${sourceSummary}.`,
+      postStrikeData.gaps.length ? `Main unresolved gap: ${postStrikeData.gaps[0]}` : "No unresolved evidence gaps were submitted."
+    ].join(" "),
+    effectiveness: {
+      rating,
+      factors: buildEffectivenessFactors(recommendation, postStrikeData, statusCounts)
+    },
+    lessonsLearned: buildLessons(recommendation, postStrikeData, trajectoryCount),
+    parameterAdjustments: buildParameterAdjustments(recommendation, postStrikeData),
+    confidenceScore: evidenceScore.blended,
+    timestamp: new Date().toISOString()
+  };
+
+  const keyMetrics: KeyMetric[] = [
+    {
+      label: "Assessed Status",
+      value: titleCase(statusLabel),
+      detail: statusOutcome[postStrikeData.status],
+      tone: postStrikeData.status === "destroyed" ? "success" : "warning",
+      icon: "check"
+    },
+    {
+      label: "Evidence Fusion",
+      value: `${postStrikeData.confidenceScore}%`,
+      detail: sourceSummary,
+      tone: postStrikeData.confidenceScore >= 75 ? "success" : "warning",
+      icon: "chart"
+    },
+    {
+      label: "Planning Risk",
+      value: titleCase(recommendation.riskLevel),
+      detail: `${recommendation.standoffDistanceKm} km review buffer in the selected package`,
+      tone: recommendation.riskLevel === "critical" || recommendation.riskLevel === "high" ? "warning" : "info",
+      icon: "shield"
+    },
+    {
+      label: "Collection Readiness",
+      value: `${postStrikeData.nextReviewActions.length} actions`,
+      detail: trajectoryCount ? `${trajectoryCount} trajectory checkpoints available for audit` : "Automated route package available",
+      tone: "info",
+      icon: "trend"
+    }
+  ];
+
+  const objectives: Objective[] = [
+    {
+      label: "Effect Confirmation",
+      value: titleCase(statusLabel),
+      detail: statusDetail[postStrikeData.status],
+      tone: postStrikeData.status === "active" || postStrikeData.status === "unknown" ? "warning" : "success"
+    },
+    {
+      label: "Evidence Coverage",
+      value: `${postStrikeData.sourceReports.length} sources reviewed`,
+      detail: sourceSummary,
+      tone: statusCounts.confirmed + statusCounts.supporting >= 2 ? "success" : "warning"
+    },
+    {
+      label: "Gap Management",
+      value: `${postStrikeData.gaps.length} open gaps`,
+      detail: postStrikeData.gaps[0] ?? "No submitted gaps remain open.",
+      tone: postStrikeData.gaps.length ? "warning" : "success"
+    }
+  ];
+
+  const timeline = buildTimeline(recommendation, postStrikeData);
+  const exportPayload = {
+    generatedAt: conclusions.timestamp,
+    recommendation,
+    postStrikeData,
+    conclusions,
+    statusCounts,
+    evidenceScore
+  };
+
+  return { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload };
+}
+
+function buildEffectivenessFactors(
+  recommendation: StrikeRecommendation,
+  postStrikeData: PostStrikeData,
+  statusCounts: Record<SourceStatus, number>
+) {
+  const factors = [
+    `${titleCase(statusLabels[postStrikeData.status])} status derived from ${postStrikeData.sourceReports.length} submitted source reports.`,
+    `${postStrikeData.confidenceScore}% evidence confidence compared with ${recommendation.confidenceScore}% planning confidence.`,
+    `${statusCounts.confirmed + statusCounts.supporting} sources currently support the assessment.`
+  ];
+
+  if (recommendation.trajectory?.length) {
+    factors.push(`${recommendation.trajectory.length} checkpoint trajectory retained for timing and source-window audit.`);
+  }
+
+  if (postStrikeData.gaps.length) {
+    factors.push(`Open evidence gap retained: ${postStrikeData.gaps[0]}`);
+  }
+
+  return factors;
+}
+
+function buildLessons(recommendation: StrikeRecommendation, postStrikeData: PostStrikeData, trajectoryCount: number) {
+  const lessons = [
+    `Evidence confidence moved ${postStrikeData.confidenceScore - recommendation.confidenceScore >= 0 ? "above" : "below"} the planning baseline, so future reports should compare plan assumptions with post-event source quality.`,
+    `${postStrikeData.sourceReports.length} source channels were available; retain raw references and timestamps before drawing final conclusions.`,
+    postStrikeData.gaps[0] ?? "No major evidence gaps were submitted, but source metadata should still be preserved for audit."
+  ];
+
+  if (trajectoryCount) {
+    lessons.push(`Trajectory checkpoint data improved auditability by tying collection windows to ${trajectoryCount} planned movement points.`);
+  } else {
+    lessons.push(`Automated recommendations should add route checkpoints when later timing reconstruction is important.`);
+  }
+
+  return lessons;
+}
+
+function buildParameterAdjustments(recommendation: StrikeRecommendation, postStrikeData: PostStrikeData) {
+  const actions = postStrikeData.nextReviewActions.length
+    ? postStrikeData.nextReviewActions
+    : ["Queue follow-up evidence review.", "Preserve raw source references.", "Re-score confidence after metadata review."];
+
+  return [
+    ...actions,
+    `Revisit sensor plan: ${recommendation.selectedParameters.sensorPlan}.`,
+    `Track deconfliction assumption: ${recommendation.selectedParameters.deconfliction}.`
+  ].slice(0, 5);
+}
+
+function buildTimeline(recommendation: StrikeRecommendation, postStrikeData: PostStrikeData): TimelineItem[] {
+  const trajectoryItems =
+    recommendation.trajectory?.map((point) => ({
+      time: `T+${point.etaOffsetMin}m`,
+      label: point.label,
+      detail: `${titleCase(point.action)} checkpoint at ${Math.round(point.altitudeM)} m / ${Math.round(point.speedKmh)} km/h`
+    })) ?? [];
+
+  const evidenceItems = postStrikeData.timeline.map((item) => ({
+    time: item.time,
+    label: item.label,
+    detail: item.detail
+  }));
+
+  return [
+    {
+      time: "T-Plan",
+      label: "Planning packet",
+      detail: `${recommendation.source === "manual-agent" ? "Manual" : "Automated"} recommendation generated at ${recommendation.confidenceScore}% confidence`
+    },
+    ...trajectoryItems,
+    ...evidenceItems
+  ].slice(0, 8);
+}
+
+function countSourceStatuses(postStrikeData: PostStrikeData): Record<SourceStatus, number> {
+  return postStrikeData.sourceReports.reduce<Record<SourceStatus, number>>(
+    (counts, report) => {
+      counts[report.status] += 1;
+      return counts;
+    },
+    { confirmed: 0, supporting: 0, pending: 0, conflicting: 0 }
+  );
+}
+
+function effectivenessRating(
+  status: PostStrikeData["status"],
+  confidence: number
+): AnalysisConclusion["effectiveness"]["rating"] {
+  if (status === "unknown") {
+    return "unknown";
+  }
+  if (status === "active") {
+    return "ineffective";
+  }
+  if (status === "partially-damaged") {
+    return "partial";
+  }
+  return confidence >= 88 ? "highly-effective" : "effective";
+}
+
+function titleCase(value: string) {
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function priorityLabel(index: number) {
+  return index === 0 ? "HIGH PRIORITY" : index === 1 ? "MEDIUM PRIORITY" : "LOW PRIORITY";
+}
+
+function impactValue(index: number) {
+  return [86, 74, 64, 52, 44][index] ?? 40;
+}
+
+function lessonTagClass(index: number) {
+  return ["intelligence", "technical", "environmental", "tactical"][index % 4];
+}
+
+function lessonTagLabel(index: number) {
+  return ["INTELLIGENCE", "TECHNICAL", "EVIDENCE", "AUDIT"][index % 4];
 }

@@ -113,11 +113,11 @@ function inferStatus(text: string | undefined, confidence: number): PostStrikeDa
   if (/\b(active|operational|no visible damage|unchanged)\b/.test(lower)) {
     return "active";
   }
-  if (/\b(partial|damaged|smoke|plume|secondary)\b/.test(lower)) {
-    return confidence >= 80 ? "destroyed" : "partially-damaged";
-  }
-  if (/\b(destroyed|neutralized|collapsed|burning)\b/.test(lower)) {
+  if (/\b(destroyed|neutralized|collapsed|fully engulfed|catastrophic|total loss)\b/.test(lower)) {
     return "destroyed";
   }
-  return confidence >= 82 ? "destroyed" : "partially-damaged";
+  if (/\b(partial|damaged|smoke|plume|secondary|burning|blast|fire)\b/.test(lower)) {
+    return "partially-damaged";
+  }
+  return confidence >= 88 ? "destroyed" : "partially-damaged";
 }
