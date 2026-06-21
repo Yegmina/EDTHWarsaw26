@@ -55,7 +55,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
     ],
     confidenceScore: 88,
     timestamp: new Date().toISOString()
-  }), [recommendation.id, postStrikeData.id]); // 💡 Fixed: Added the missing dependency array here
+  }), [recommendation.id, postStrikeData.id]);
 
   return (
     <div className="pipeline-panel">
@@ -345,15 +345,18 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
       <style jsx>{`
         .pipeline-panel {
-          background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-          border: 1px solid rgba(74, 144, 226, 0.2);
-          border-radius: 12px;
+          background:
+            linear-gradient(rgba(117, 240, 200, 0.025) 50%, transparent 50%),
+            linear-gradient(180deg, rgba(16, 21, 18, 0.82), rgba(5, 7, 6, 0.72));
+          background-size: 100% 4px, auto;
+          border: 1px solid rgba(117, 240, 200, 0.16);
+          border-radius: 8px;
           overflow: hidden;
         }
 
         .panel-header {
           padding: 1.5rem;
-          border-bottom: 1px solid rgba(74, 144, 226, 0.15);
+          border-bottom: 1px solid rgba(117, 240, 200, 0.14);
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -363,14 +366,14 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           font-size: 0.75rem;
           text-transform: uppercase;
           letter-spacing: 0.1em;
-          color: #4a90e2;
+          color: #75f0c8;
           font-weight: 600;
         }
 
         .panel-header h2 {
           margin: 0.25rem 0 0 0;
           font-size: 1.25rem;
-          color: #e8edf5;
+          color: #f4f6ef;
         }
 
         .header-metrics {
@@ -383,20 +386,20 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           align-items: center;
           gap: 0.5rem;
           padding: 0.5rem 0.75rem;
-          background: rgba(20, 25, 50, 0.5);
-          border: 1px solid rgba(74, 144, 226, 0.2);
+          background: rgba(5, 7, 6, 0.5);
+          border: 1px solid rgba(117, 240, 200, 0.16);
           border-radius: 8px;
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.8rem;
         }
 
         .metric-badge strong {
-          color: #4a90e2;
+          color: #75f0c8;
           font-size: 1.1rem;
         }
 
         .text-emerald {
-          color: #48bb78 !important;
+          color: #75f0c8 !important;
         }
 
         .dashboard-layout {
@@ -407,11 +410,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .dashboard-nav {
           padding: 1.5rem 1rem;
-          border-right: 1px solid rgba(74, 144, 226, 0.15);
+          border-right: 1px solid rgba(117, 240, 200, 0.14);
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
-          background: rgba(10, 14, 39, 0.3);
+          background: rgba(5, 7, 6, 0.36);
         }
 
         .nav-item {
@@ -421,7 +424,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           padding: 0.75rem;
           background: transparent;
           border: none;
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.85rem;
           border-radius: 8px;
           cursor: pointer;
@@ -430,14 +433,14 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .nav-item:hover {
-          background: rgba(74, 144, 226, 0.1);
-          color: #e8edf5;
+          background: rgba(117, 240, 200, 0.08);
+          color: #f4f6ef;
         }
 
         .nav-item.nav-active {
-          background: linear-gradient(135deg, rgba(74, 144, 226, 0.2), rgba(53, 122, 189, 0.2));
-          border: 1px solid rgba(74, 144, 226, 0.3);
-          color: #4a90e2;
+          background: rgba(117, 240, 200, 0.1);
+          border: 1px solid rgba(117, 240, 200, 0.24);
+          color: #75f0c8;
           font-weight: 600;
         }
 
@@ -453,12 +456,12 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          color: #e8edf5;
+          color: #f4f6ef;
           margin-bottom: 1rem;
         }
 
         .summary-text {
-          color: #8b95b5;
+          color: #9bad9f;
           line-height: 1.6;
           font-size: 0.9rem;
         }
@@ -474,8 +477,8 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           gap: 1rem;
           padding: 1rem;
-          background: rgba(20, 25, 50, 0.5);
-          border: 1px solid rgba(74, 144, 226, 0.15);
+          background: rgba(5, 7, 6, 0.42);
+          border: 1px solid rgba(117, 240, 200, 0.12);
           border-radius: 8px;
         }
 
@@ -490,8 +493,8 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .metric-icon.success {
-          background: rgba(72, 187, 120, 0.15);
-          color: #48bb78;
+          background: rgba(117, 240, 200, 0.12);
+          color: #75f0c8;
         }
 
         .metric-icon.warning {
@@ -500,32 +503,32 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .metric-icon.info {
-          background: rgba(74, 144, 226, 0.15);
-          color: #4a90e2;
+          background: rgba(117, 240, 200, 0.1);
+          color: #75f0c8;
         }
 
         .metric-content span {
           font-size: 0.7rem;
-          color: #6b7595;
+          color: #6f8378;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
 
         .metric-content strong {
           display: block;
-          color: #e8edf5;
+          color: #f4f6ef;
           font-size: 1.1rem;
           margin: 0.2rem 0;
         }
 
         .metric-content p {
-          color: #6b7595;
+          color: #6f8378;
           font-size: 0.8rem;
           margin: 0;
         }
 
         .timeline-summary h4 {
-          color: #e8edf5;
+          color: #f4f6ef;
           margin-bottom: 1rem;
         }
 
@@ -551,17 +554,17 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .timeline-marker.complete {
-          background: #48bb78;
-          box-shadow: 0 0 8px rgba(72, 187, 120, 0.5);
+          background: #75f0c8;
+          box-shadow: 0 0 8px rgba(117, 240, 200, 0.38);
         }
 
         .timeline-item strong {
-          color: #e8edf5;
+          color: #f4f6ef;
           font-size: 0.85rem;
         }
 
         .timeline-item p {
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.8rem;
           margin: 0.15rem 0 0 0;
         }
@@ -572,7 +575,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          color: #e8edf5;
+          color: #f4f6ef;
           margin-bottom: 1.25rem;
         }
 
@@ -583,13 +586,13 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .effectiveness-card {
           padding: 1.25rem;
-          background: rgba(20, 25, 50, 0.5);
-          border: 1px solid rgba(74, 144, 226, 0.15);
+          background: rgba(5, 7, 6, 0.42);
+          border: 1px solid rgba(117, 240, 200, 0.12);
           border-radius: 8px;
         }
 
         .effectiveness-card h4 {
-          color: #e8edf5;
+          color: #f4f6ef;
           margin-bottom: 1rem;
         }
 
@@ -606,7 +609,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .objective-item.success svg {
-          color: #48bb78;
+          color: #75f0c8;
         }
 
         .objective-item.warning svg {
@@ -615,12 +618,12 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .objective-item strong {
           display: block;
-          color: #e8edf5;
+          color: #f4f6ef;
           font-size: 0.85rem;
         }
 
         .objective-item span {
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.8rem;
         }
 
@@ -635,12 +638,12 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           align-items: center;
           gap: 0.5rem;
           padding: 0.35rem 0;
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.85rem;
         }
 
         .factors-list svg {
-          color: #4a90e2;
+          color: #75f0c8;
         }
 
         .comparison-grid {
@@ -652,21 +655,21 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         .comparison-item {
           text-align: center;
           padding: 0.75rem;
-          background: rgba(10, 14, 39, 0.4);
+          background: rgba(5, 7, 6, 0.42);
           border-radius: 8px;
         }
 
         .comparison-item span {
           display: block;
           font-size: 0.7rem;
-          color: #6b7595;
+          color: #6f8378;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
 
         .comparison-item strong {
           display: block;
-          color: #e8edf5;
+          color: #f4f6ef;
           font-size: 1.1rem;
           margin-top: 0.25rem;
         }
@@ -681,21 +684,21 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           gap: 1rem;
           padding: 1rem;
-          background: rgba(20, 25, 50, 0.5);
-          border: 1px solid rgba(74, 144, 226, 0.15);
+          background: rgba(5, 7, 6, 0.42);
+          border: 1px solid rgba(117, 240, 200, 0.12);
           border-radius: 8px;
         }
 
         .lesson-number {
           font-size: 1.5rem;
           font-weight: 700;
-          color: #4a90e2;
+          color: #75f0c8;
           font-family: monospace;
           flex-shrink: 0;
         }
 
         .lesson-content p {
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.85rem;
           margin: 0 0 0.5rem 0;
         }
@@ -720,9 +723,9 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .tag.environmental {
-          background: rgba(72, 187, 120, 0.15);
-          color: #48bb78;
-          border: 1px solid rgba(72, 187, 120, 0.3);
+          background: rgba(117, 240, 200, 0.1);
+          color: #75f0c8;
+          border: 1px solid rgba(117, 240, 200, 0.24);
         }
 
         .tag.intelligence {
@@ -732,9 +735,9 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .tag.technical {
-          background: rgba(74, 144, 226, 0.15);
-          color: #4a90e2;
-          border: 1px solid rgba(74, 144, 226, 0.3);
+          background: rgba(117, 240, 200, 0.1);
+          color: #75f0c8;
+          border: 1px solid rgba(117, 240, 200, 0.24);
         }
 
         .parameters-list {
@@ -745,8 +748,8 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .parameter-card {
           padding: 1.25rem;
-          background: rgba(20, 25, 50, 0.5);
-          border: 1px solid rgba(74, 144, 226, 0.15);
+          background: rgba(5, 7, 6, 0.42);
+          border: 1px solid rgba(117, 240, 200, 0.12);
           border-radius: 8px;
         }
 
@@ -761,11 +764,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           width: 40px;
           height: 40px;
           border-radius: 8px;
-          background: rgba(74, 144, 226, 0.15);
+          background: rgba(117, 240, 200, 0.1);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #4a90e2;
+          color: #75f0c8;
         }
 
         .parameter-priority {
@@ -776,7 +779,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .parameter-text {
-          color: #8b95b5;
+          color: #9bad9f;
           font-size: 0.9rem;
           margin: 0 0 1rem 0;
         }
@@ -788,27 +791,27 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         }
 
         .parameter-impact span {
-          color: #6b7595;
+          color: #6f8378;
           font-size: 0.8rem;
         }
 
         .impact-bar {
           flex: 1;
           height: 6px;
-          background: rgba(74, 144, 226, 0.15);
+          background: rgba(117, 240, 200, 0.12);
           border-radius: 3px;
           overflow: hidden;
         }
 
         .impact-fill {
           height: 100%;
-          background: linear-gradient(90deg, #4a90e2, #48bb78);
+          background: linear-gradient(90deg, #75f0c8, #f2b84b);
           border-radius: 3px;
           transition: width 0.5s ease;
         }
 
         .parameter-impact strong {
-          color: #e8edf5;
+          color: #f4f6ef;
           font-size: 1.1rem;
         }
       `}</style>

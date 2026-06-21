@@ -5,6 +5,20 @@ export type Coordinates = {
   lng: number;
 };
 
+export type TrajectoryAction = "launch" | "transit" | "hold" | "observe" | "effect" | "egress" | "recovery";
+
+export type ManualTrajectoryPoint = {
+  id: string;
+  label: string;
+  lat: number;
+  lng: number;
+  altitudeM: number;
+  speedKmh: number;
+  etaOffsetMin: number;
+  action: TrajectoryAction;
+  notes: string;
+};
+
 export type StrikeRecommendation = {
   id: string;
   createdAt: string;
@@ -19,6 +33,8 @@ export type StrikeRecommendation = {
   rationale: string[];
   constraints: string[];
   intelligenceGaps: string[];
+  trajectory?: ManualTrajectoryPoint[];
+  setupChecklist?: string[];
   selectedParameters: {
     routeProfile: string;
     timing: string;
@@ -38,6 +54,13 @@ export type ManualPlanInput = {
   environmentalNotes: string;
   additionalContext: string;
   operatorName: string;
+  trajectory: ManualTrajectoryPoint[];
+  assetPackage: string;
+  sensorTasking: string;
+  commsPlan: string;
+  abortCriteria: string;
+  fallbackPlan: string;
+  bdaCollectionPlan: string;
 };
 
 export type AgentAnalyzedPlan = {

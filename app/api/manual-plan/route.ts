@@ -8,6 +8,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json()) as ManualPlanInput;
+    const trajectory = Array.isArray(payload.trajectory) ? payload.trajectory : [];
 
     if (!payload.planTitle || !payload.targetDescription) {
       return NextResponse.json(
@@ -38,10 +39,17 @@ export async function POST(request: Request) {
         `Plan Title: ${payload.planTitle}`,
         `Target: ${payload.targetDescription}`,
         `Coordinates: ${payload.coordinates.lat}, ${payload.coordinates.lng}`,
+        `Trajectory: ${trajectory.map((point) => `${point.etaOffsetMin}min ${point.label} ${point.action} ${point.lat},${point.lng} alt=${point.altitudeM}m speed=${point.speedKmh}kmh notes=${point.notes}`).join(" | ")}`,
         `Approach Strategy: ${payload.approachStrategy}`,
         `Timing: ${payload.timingConsiderations}`,
         `AD Avoidance: ${payload.adAvoidanceStrategy}`,
         `Environment: ${payload.environmentalNotes}`,
+        `Asset Package: ${payload.assetPackage}`,
+        `Sensor Tasking: ${payload.sensorTasking}`,
+        `Comms Plan: ${payload.commsPlan}`,
+        `Abort Criteria: ${payload.abortCriteria}`,
+        `Fallback Plan: ${payload.fallbackPlan}`,
+        `BDA Collection Plan: ${payload.bdaCollectionPlan}`,
         `Additional Context: ${payload.additionalContext}`,
         `Operator: ${payload.operatorName}`
       ].join("\n");
@@ -95,12 +103,14 @@ export async function POST(request: Request) {
         weaknesses: [
           "Limited real-time intelligence integration",
           "Environmental factors may change during execution",
-          "AD avoidance strategy requires satellite confirmation"
+          "AD avoidance strategy requires satellite confirmation",
+          "Trajectory assumptions require timing and sensor deconfliction checks"
         ],
         recommendedModifications: [
           "Integrate real-time weather data before execution",
           "Confirm AD positions via satellite imagery",
-          "Add contingency routing for dynamic threats"
+          "Add contingency routing for dynamic threats",
+          "Review each trajectory checkpoint against source freshness and collection windows"
         ],
         alternativeApproaches: [
           "Consider multi-axis approach for redundancy",
@@ -131,6 +141,7 @@ function recommendationFromManualPlan(
   confidenceScore: number,
   riskLevel: RiskLevel
 ): StrikeRecommendation {
+  const trajectory = Array.isArray(payload.trajectory) ? payload.trajectory : [];
   return {
     id: `manual-rec-${Date.now()}`,
     createdAt: new Date().toISOString(),
@@ -157,11 +168,22 @@ function recommendationFromManualPlan(
       "Independent imagery and sensor confirmation are required.",
       "Any conflicting reports should be retained for Stage 3 analysis."
     ],
+    trajectory,
+    setupChecklist: [
+      `Asset package: ${payload.assetPackage || "not specified"}`,
+      `Sensor tasking: ${payload.sensorTasking || "not specified"}`,
+      `Comms plan: ${payload.commsPlan || "not specified"}`,
+      `Abort criteria: ${payload.abortCriteria || "not specified"}`,
+      `Fallback plan: ${payload.fallbackPlan || "not specified"}`,
+      `BDA collection: ${payload.bdaCollectionPlan || "not specified"}`
+    ],
     selectedParameters: {
-      routeProfile: payload.approachStrategy || "Manual route profile",
+      routeProfile: trajectory.length
+        ? `${trajectory.length} checkpoint trajectory: ${trajectory.map((point) => point.label).join(" -> ")}`
+        : payload.approachStrategy || "Manual route profile",
       timing: payload.timingConsiderations || "Manual timing window",
-      sensorPlan: "Video, public camera, audio, and satellite corroboration",
-      deconfliction: "Analyst review required before operational use",
+      sensorPlan: payload.sensorTasking || "Video, public camera, audio, and satellite corroboration",
+      deconfliction: payload.commsPlan || "Analyst review required before operational use",
       weatherAssumption: payload.environmentalNotes || "Weather assumptions not specified"
     }
   };
