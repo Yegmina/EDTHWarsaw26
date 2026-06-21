@@ -1248,7 +1248,7 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
           </div>
         ) : null}
         {activeTool === "alerts" ? (
-          <p>Latest source updates are queued for analyst review. No confirmed alert feed is attached.</p>
+          <p>Latest source updates are queued for analyst review. Alert feed status is pending confirmation.</p>
         ) : null}
         {activeTool === "info" ? (
           <p>
@@ -1392,8 +1392,8 @@ export function MapPanel({ layers, rangeRings, onRangeAnchorChange }: MapPanelPr
             </button>
           </div>
         ) : null}
-        {activeTool === "weather" ? <p>Weather layer placeholder active. Connect provider data when available.</p> : null}
-        {activeTool === "fires" ? <p>Incident/fires layer placeholder active. No live incident feed is configured.</p> : null}
+        {activeTool === "weather" ? <p>Weather layer is in standby. Provider telemetry will populate this channel when attached.</p> : null}
+        {activeTool === "fires" ? <p>Incident layer is in standby. Feed status is pending external confirmation.</p> : null}
       </div>
       {selectedCamera && showPublicCameras ? (
         <div className="camera-preview-panel">

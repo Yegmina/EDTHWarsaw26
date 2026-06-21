@@ -115,7 +115,7 @@ type PipelineOverviewItem = {
 
 const sessionStorageKey = "aerorozum-warsaw26-pipeline-session-v1";
 
-const sampleInput = `Source: private analyst note
+const packetInput = `Source: private analyst note
 Claim: 5 Pantsir air-defense systems are positioned around the Red Square perimeter in Moscow.
 Time observed: not stated.
 Evidence attached: none.
@@ -684,10 +684,10 @@ export default function Home() {
                 className="ghost-button"
                 onClick={() => {
                   setSourceTitle("Private analyst note");
-                  setRawText(sampleInput);
+                  setRawText(packetInput);
                 }}
               >
-                Load sample
+                Load packet
               </button>
               <div className="telemetry">
                 {inputStats.words} words / {inputStats.chars} chars

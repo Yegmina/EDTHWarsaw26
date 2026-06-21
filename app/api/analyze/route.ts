@@ -261,7 +261,7 @@ export async function POST(request: Request) {
 
   if (rawText.length > 18000) {
     return NextResponse.json(
-      { error: "Input is too long for this prototype. Keep it under 18,000 characters." },
+      { error: "Input exceeds the current intake limit. Keep it under 18,000 characters." },
       { status: 400 }
     );
   }

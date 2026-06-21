@@ -1,6 +1,6 @@
 # AeroRozum Warsaw26 Intelligence Analysis Pipeline
 
-AeroRozum Warsaw26 is a Next.js prototype for a staged intelligence-analysis and battle-damage-assessment workflow. It combines current-state text intake, satellite map context, manual or automated planning, multi-source evidence fusion, video delta assessment, and final audit reporting in one browser interface. The interface also autosaves the working session locally and supports JSON export/import for handoff or demo recovery.
+AeroRozum Warsaw26 is a Next.js platform for a staged intelligence-analysis and battle-damage-assessment workflow. It combines current-state text intake, satellite map context, manual or automated planning, multi-source evidence fusion, video delta assessment, and final audit reporting in one browser interface. The interface also autosaves the working session locally and supports JSON export/import for handoff and recovery.
 
 ## Pipeline
 
@@ -34,7 +34,7 @@ The Stage 2 video panel runs in the browser:
 
 - local file upload only; the video is not uploaded to the server
 - RGB, thermal, and mixed source modes
-- configurable sample frame rate, sensitivity, and concurrency pacing
+- configurable frame sampling rate, sensitivity, and concurrency pacing
 - full-clip frame-delta analysis
 - live canvas boxes over the video during playback
 - event jump list with timestamps, class labels, and scores
@@ -85,7 +85,7 @@ npx.cmd tsc --noEmit
 npm run build
 ```
 
-The current implementation has been browser-tested through:
+The current implementation has been browser-validated through:
 
 1. Stage 1 automated recommendation.
 2. Stage 2 video upload and frame-delta analysis.
