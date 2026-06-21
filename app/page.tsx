@@ -104,6 +104,15 @@ type PipelineSessionSnapshot = {
   agentAnalysis: unknown;
 };
 
+type PipelineOverviewItem = {
+  stage: PipelineStage;
+  label: string;
+  status: string;
+  detail: string;
+  metric: string;
+  tone: "ready" | "review" | "pending";
+};
+
 const sessionStorageKey = "aerorozum-warsaw26-pipeline-session-v1";
 
 const sampleInput = `Source: private analyst note
@@ -280,6 +289,86 @@ export default function Home() {
       gapCount: analysis.sourceGaps.length
     };
   }, [analysis, lastAnalyzedText, rangeAnchor, rawText, sourceTitle]);
+
+  const pipelineOverview = useMemo<PipelineOverviewItem[]>(() => {
+    const currentText = rawText.trim();
+    const intakeReady = Boolean(currentText) && lastAnalyzedText === currentText;
+    const intakeClaims = analysis.observations.filter((observation) => observation.label !== "Awaiting source claim").length;
+    const recommendation = strikeRecommendation as
+      | {
+          confidenceScore?: number;
+          riskLevel?: string;
+          trajectory?: unknown[];
+          decisionGates?: unknown[];
+        }
+      | null;
+    const postStrike = postStrikeData as
+      | {
+          status?: string;
+          confidenceScore?: number;
+          sourceReports?: unknown[];
+          timeline?: unknown[];
+          gaps?: unknown[];
+        }
+      | null;
+    const planDetailParts = [
+      recommendation?.riskLevel ? `${formatStatusText(recommendation.riskLevel)} risk` : "",
+      Array.isArray(recommendation?.trajectory) ? `${recommendation.trajectory.length} route points` : "",
+      Array.isArray(recommendation?.decisionGates) ? `${recommendation.decisionGates.length} gates` : ""
+    ].filter(Boolean);
+    const sourceCount = Array.isArray(postStrike?.sourceReports) ? postStrike.sourceReports.length : 0;
+    const timelineCount = Array.isArray(postStrike?.timeline) ? postStrike.timeline.length : 0;
+    const gapCount = Array.isArray(postStrike?.gaps) ? postStrike.gaps.length : 0;
+
+    return [
+      {
+        stage: "stage-0",
+        label: "Intake",
+        status: intakeReady ? "Analyzed" : currentText ? "Queued" : "Awaiting packet",
+        detail: intakeReady
+          ? `${formatStatusText(String(analysis.confidence))} confidence / ${analysis.mapLayers.length} map layers / ${rangeRings.length} range rings`
+          : "Source text, imagery, provenance, and map context pending.",
+        metric: intakeReady ? `${intakeClaims} claims` : `${currentText.length} chars`,
+        tone: intakeReady ? "ready" : currentText ? "review" : "pending"
+      },
+      {
+        stage: "stage-1",
+        label: "Planning",
+        status: recommendation ? "Plan ready" : agentAnalysis ? "Agent review" : "Pending plan",
+        detail: recommendation ? planDetailParts.join(" / ") || "Recommendation package prepared." : "Automated or manual planning package not handed off yet.",
+        metric: recommendation?.confidenceScore ? `${recommendation.confidenceScore}%` : agentAnalysis ? "review" : "none",
+        tone: recommendation ? "ready" : agentAnalysis ? "review" : "pending"
+      },
+      {
+        stage: "stage-2",
+        label: "Evidence",
+        status: postStrike ? formatStatusText(String(postStrike.status || "assessing")) : "Collection pending",
+        detail: postStrike
+          ? `${postStrike.confidenceScore ?? 0}% confidence / ${timelineCount} timeline events`
+          : "Video, camera, audio, satellite, and operator source matrix waiting.",
+        metric: postStrike ? `${sourceCount} sources` : "0 sources",
+        tone: postStrike ? "ready" : "pending"
+      },
+      {
+        stage: "stage-3",
+        label: "Assessment",
+        status: recommendation && postStrike ? "Dashboard ready" : "Awaiting evidence",
+        detail: recommendation && postStrike
+          ? `${gapCount} unresolved evidence gaps carried into final review.`
+          : "Final analysis board activates after planning and evidence fusion.",
+        metric: recommendation && postStrike ? "report" : "locked",
+        tone: recommendation && postStrike ? "ready" : "pending"
+      }
+    ];
+  }, [agentAnalysis, analysis, lastAnalyzedText, postStrikeData, rangeRings.length, rawText, strikeRecommendation]);
+
+  const pipelineCompletion = useMemo(() => {
+    const completedWeight = pipelineOverview.reduce(
+      (total, item) => total + (item.tone === "ready" ? 1 : item.tone === "review" ? 0.5 : 0),
+      0
+    );
+    return Math.round((completedWeight / pipelineOverview.length) * 100);
+  }, [pipelineOverview]);
 
   async function handleAnalyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -506,6 +595,39 @@ export default function Home() {
           <Camera size={15} />
           <span>{presentationMode ? "Exit capture" : "Capture"}</span>
         </button>
+      </section>
+
+      <section className="pipeline-overview-board" aria-label="Pipeline overview">
+        <div className="overview-header">
+          <div>
+            <span className="panel-kicker">Pipeline Overview</span>
+            <strong>Current workflow readiness</strong>
+          </div>
+          <div className="overview-progress">
+            <span>{pipelineCompletion}%</span>
+            <div aria-label={`Pipeline readiness ${pipelineCompletion}%`}>
+              <i style={{ width: `${pipelineCompletion}%` }} />
+            </div>
+          </div>
+        </div>
+        <div className="overview-card-grid">
+          {pipelineOverview.map((item) => (
+            <button
+              type="button"
+              aria-current={activeStage === item.stage ? "step" : undefined}
+              aria-label={`${item.label} overview: ${item.status}`}
+              className={`overview-card overview-${item.tone} ${activeStage === item.stage ? "overview-active" : ""}`}
+              data-stage={item.stage}
+              key={item.stage}
+              onClick={() => handleStageChange(item.stage)}
+            >
+              <span>{item.label}</span>
+              <strong>{item.status}</strong>
+              <em>{item.metric}</em>
+              <p>{item.detail}</p>
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Stage 0: Current-State Intake */}
@@ -949,6 +1071,14 @@ function compactText(value: string, maxLength: number) {
     return "No Stage 0 brief is available yet.";
   }
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
+}
+
+function formatStatusText(value: string) {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function parseSessionSnapshot(raw: string): PipelineSessionSnapshot {
