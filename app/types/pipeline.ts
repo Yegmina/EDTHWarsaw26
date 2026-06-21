@@ -8,6 +8,8 @@ export type Coordinates = {
 export type TrajectoryAction = "launch" | "transit" | "hold" | "observe" | "effect" | "egress" | "recovery";
 export type TrajectorySensorMode = "none" | "rgb-video" | "thermal-video" | "audio" | "satellite-cue" | "public-camera";
 export type SetupStatus = "ready" | "pending" | "blocked";
+export type DecisionGateStatus = "go" | "hold" | "review" | "abort";
+export type ContingencyPriority = "primary" | "secondary" | "emergency";
 
 export type ManualTrajectoryPoint = {
   id: string;
@@ -42,6 +44,25 @@ export type ManualCollectionWindow = {
   objective: string;
 };
 
+export type ManualDecisionGate = {
+  id: string;
+  label: string;
+  etaOffsetMin: number;
+  owner: string;
+  condition: string;
+  status: DecisionGateStatus;
+  action: string;
+};
+
+export type ManualContingencyBranch = {
+  id: string;
+  trigger: string;
+  action: string;
+  owner: string;
+  priority: ContingencyPriority;
+  notes: string;
+};
+
 export type StrikeRecommendation = {
   id: string;
   createdAt: string;
@@ -57,6 +78,8 @@ export type StrikeRecommendation = {
   constraints: string[];
   intelligenceGaps: string[];
   trajectory?: ManualTrajectoryPoint[];
+  decisionGates?: ManualDecisionGate[];
+  contingencyBranches?: ManualContingencyBranch[];
   setupChecklist?: string[];
   selectedParameters: {
     routeProfile: string;
@@ -94,6 +117,8 @@ export type ManualPlanInput = {
   trajectory: ManualTrajectoryPoint[];
   setupItems: ManualSetupItem[];
   collectionWindows: ManualCollectionWindow[];
+  decisionGates: ManualDecisionGate[];
+  contingencyBranches: ManualContingencyBranch[];
   assetPackage: string;
   sensorTasking: string;
   commsPlan: string;

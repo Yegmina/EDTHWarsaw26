@@ -1047,6 +1047,12 @@ button:disabled {
 .brief-panel,
 .observations-panel,
 .gaps-panel {
+  background:
+    linear-gradient(90deg, rgba(117, 240, 200, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(117, 240, 200, 0.03) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(117, 240, 200, 0.05), transparent 36%),
+    rgba(15, 20, 18, 0.88);
+  background-size: 36px 36px, 36px 36px, auto, auto;
   padding-bottom: 16px;
 }
 
@@ -1135,7 +1141,7 @@ button:disabled {
   grid-template-columns: 92px 1fr;
   min-height: 92px;
   border: 1px solid var(--line);
-  background: rgba(5, 7, 6, 0.48);
+  background: rgba(5, 7, 6, 0.62);
   color: inherit;
   text-decoration: none;
   overflow: hidden;
@@ -1190,7 +1196,7 @@ button:disabled {
 
 .observation-card {
   border: 1px solid var(--line);
-  background: rgba(5, 7, 6, 0.46);
+  background: rgba(5, 7, 6, 0.62);
   padding: 12px;
 }
 
@@ -1425,6 +1431,36 @@ ul {
   gap: 1.5rem;
 }
 
+.intake-dashboard {
+  grid-template-columns: minmax(360px, 0.9fr) minmax(460px, 1.3fr) minmax(340px, 0.85fr);
+  grid-template-rows: auto auto;
+  gap: 14px;
+  max-width: 1480px;
+}
+
+.stage-1-container,
+.stage-2-container,
+.stage-3-container {
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.stage-3-container .dashboard-grid {
+  align-items: stretch;
+}
+
+@media (max-width: 1180px) {
+  .intake-dashboard {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .intake-dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* When showing single panel stages, take full width */
 .dashboard-grid:has(> :only-child) {
   grid-template-columns: 1fr;
@@ -1555,7 +1591,7 @@ ul {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.85rem;
   border-bottom: 1px solid rgba(117, 240, 200, 0.12);
   padding: 1rem 1.25rem;
@@ -2048,6 +2084,84 @@ ul {
 .trajectory-list {
   display: grid;
   gap: 0.85rem;
+}
+
+.route-segment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.route-segment-card {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(117, 240, 200, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(117, 240, 200, 0.08), transparent 44%),
+    rgba(5, 7, 6, 0.46);
+  padding: 0.85rem;
+}
+
+.route-segment-card > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.route-segment-card strong {
+  color: #75f0c8;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+}
+
+.route-segment-card span {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.route-segment-card p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.route-segment-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.route-segment-card dl div {
+  min-width: 0;
+  border: 1px solid rgba(117, 240, 200, 0.12);
+  border-radius: 8px;
+  background: rgba(117, 240, 200, 0.06);
+  padding: 0.45rem;
+}
+
+.route-segment-card dt,
+.route-segment-card dd {
+  margin: 0;
+}
+
+.route-segment-card dt {
+  color: var(--faint);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.route-segment-card dd {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trajectory-card {

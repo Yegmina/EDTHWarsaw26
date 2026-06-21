@@ -487,7 +487,7 @@ export default function Home() {
 
       {/* Stage 0: Current-State Intake */}
       {activeStage === "stage-0" && (
-        <section className="dashboard-grid">
+        <section className="dashboard-grid intake-dashboard">
           <form className="panel input-panel" onSubmit={handleAnalyze}>
             <div className="panel-header">
               <div>

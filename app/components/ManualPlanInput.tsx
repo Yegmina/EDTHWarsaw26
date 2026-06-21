@@ -6,6 +6,8 @@ import {
   Brain,
   CheckCircle2,
   ClipboardCheck,
+  GitBranch,
+  ListChecks,
   Loader2,
   MapPin,
   Plus,
@@ -19,8 +21,12 @@ import type {
   AgentAnalyzedPlan,
   ManualPlanInput as ManualPlanPayload,
   ManualCollectionWindow,
+  ManualContingencyBranch,
+  ManualDecisionGate,
   ManualSetupItem,
   ManualTrajectoryPoint,
+  ContingencyPriority,
+  DecisionGateStatus,
   SetupStatus,
   TrajectoryAction,
   TrajectorySensorMode
@@ -159,6 +165,63 @@ const initialCollectionWindows: ManualCollectionWindow[] = [
   }
 ];
 
+const initialDecisionGates: ManualDecisionGate[] = [
+  {
+    id: "gate-1",
+    label: "Source match gate",
+    etaOffsetMin: 12,
+    owner: "Intake lead",
+    condition: "Continue only if current-state claim still matches the reviewed source packet",
+    status: "go",
+    action: "Proceed to transit checkpoint and preserve source snapshot"
+  },
+  {
+    id: "gate-2",
+    label: "Sensor quality gate",
+    etaOffsetMin: 27,
+    owner: "BDA review cell",
+    condition: "Hold if thermal/RGB capture is degraded or public camera sector is occluded",
+    status: "review",
+    action: "Re-check camera/audio windows and extend observation hold"
+  },
+  {
+    id: "gate-3",
+    label: "Evidence fusion gate",
+    etaOffsetMin: 45,
+    owner: "Fusion desk",
+    condition: "Do not finalize status until at least two source channels are retained with timestamps",
+    status: "hold",
+    action: "Queue satellite retask and keep status provisional"
+  }
+];
+
+const initialContingencyBranches: ManualContingencyBranch[] = [
+  {
+    id: "branch-1",
+    trigger: "Primary video feed drops before event marker",
+    action: "Switch to public camera and audio-first evidence workflow",
+    owner: "Sensor desk",
+    priority: "primary",
+    notes: "Keep the last valid frame and packet-loss marker in the evidence log"
+  },
+  {
+    id: "branch-2",
+    trigger: "Weather or smoke blocks visual confirmation",
+    action: "Defer final assessment until satellite retask and delayed camera sweep",
+    owner: "BDA review cell",
+    priority: "secondary",
+    notes: "Use confidence penalty and keep conclusion status unresolved"
+  },
+  {
+    id: "branch-3",
+    trigger: "Source contradiction appears during collection",
+    action: "Freeze automated conclusion and route all sources to human review",
+    owner: "Fusion desk",
+    priority: "emergency",
+    notes: "Flag conflicting source metadata in Stage 3 handoff report"
+  }
+];
+
 const initialForm = {
   planTitle: "Operator submitted plan",
   targetDescription: "Priority infrastructure node requiring post-action assessment planning",
@@ -189,18 +252,26 @@ const trajectorySensorModes: TrajectorySensorMode[] = [
 ];
 const setupStatuses: SetupStatus[] = ["ready", "pending", "blocked"];
 const collectionSources: ManualCollectionWindow["source"][] = ["video", "camera", "audio", "satellite", "operator", "other"];
+const decisionGateStatuses: DecisionGateStatus[] = ["go", "hold", "review", "abort"];
+const contingencyPriorities: ContingencyPriority[] = ["primary", "secondary", "emergency"];
 
 export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
   const [form, setForm] = useState(initialForm);
   const [trajectory, setTrajectory] = useState<ManualTrajectoryPoint[]>(initialTrajectory);
   const [setupItems, setSetupItems] = useState<ManualSetupItem[]>(initialSetupItems);
   const [collectionWindows, setCollectionWindows] = useState<ManualCollectionWindow[]>(initialCollectionWindows);
+  const [decisionGates, setDecisionGates] = useState<ManualDecisionGate[]>(initialDecisionGates);
+  const [contingencyBranches, setContingencyBranches] =
+    useState<ManualContingencyBranch[]>(initialContingencyBranches);
   const [analysis, setAnalysis] = useState<AgentAnalyzedPlan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const routeStats = useMemo(() => summarizeRoute(trajectory), [trajectory]);
+  const routeSegments = useMemo(() => buildRouteSegments(trajectory), [trajectory]);
   const setupStats = useMemo(() => summarizeSetup(setupItems), [setupItems]);
+  const decisionStats = useMemo(() => summarizeDecisionGates(decisionGates), [decisionGates]);
+  const contingencyStats = useMemo(() => summarizeContingencies(contingencyBranches), [contingencyBranches]);
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -366,6 +437,58 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
     setCollectionWindows((windows) => (windows.length <= 1 ? windows : windows.filter((window) => window.id !== id)));
   }
 
+  function updateDecisionGate(id: string, updates: Partial<ManualDecisionGate>) {
+    setDecisionGates((gates) => gates.map((gate) => (gate.id === id ? { ...gate, ...updates } : gate)));
+  }
+
+  function addDecisionGate() {
+    setDecisionGates((gates) => {
+      const last = gates[gates.length - 1] ?? initialDecisionGates[0];
+      return [
+        ...gates,
+        {
+          id: `gate-${Date.now()}`,
+          label: `Decision gate ${gates.length + 1}`,
+          etaOffsetMin: last.etaOffsetMin + 10,
+          owner: "Review lead",
+          condition: "Define the condition that must be true before the route package continues",
+          status: "review",
+          action: "Define continuation, hold, or escalation action"
+        }
+      ];
+    });
+  }
+
+  function removeDecisionGate(id: string) {
+    setDecisionGates((gates) => (gates.length <= 1 ? gates : gates.filter((gate) => gate.id !== id)));
+  }
+
+  function updateContingencyBranch(id: string, updates: Partial<ManualContingencyBranch>) {
+    setContingencyBranches((branches) =>
+      branches.map((branch) => (branch.id === id ? { ...branch, ...updates } : branch))
+    );
+  }
+
+  function addContingencyBranch() {
+    setContingencyBranches((branches) => [
+      ...branches,
+      {
+        id: `branch-${Date.now()}`,
+        trigger: `Contingency trigger ${branches.length + 1}`,
+        action: "Define alternate evidence, timing, or review path",
+        owner: "Review lead",
+        priority: "secondary",
+        notes: "Describe how this branch changes collection, confidence, or handoff"
+      }
+    ]);
+  }
+
+  function removeContingencyBranch(id: string) {
+    setContingencyBranches((branches) =>
+      branches.length <= 1 ? branches : branches.filter((branch) => branch.id !== id)
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -387,6 +510,8 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
       trajectory,
       setupItems,
       collectionWindows,
+      decisionGates,
+      contingencyBranches,
       assetPackage: form.assetPackage,
       sensorTasking: form.sensorTasking,
       commsPlan: form.commsPlan,
@@ -448,6 +573,18 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
           <span>Collection</span>
           <strong>{collectionWindows.length} windows</strong>
           <p>Video, camera, audio, satellite, and operator review slots</p>
+        </article>
+        <article>
+          <ListChecks size={16} />
+          <span>Decision Gates</span>
+          <strong>{decisionGates.length} gates</strong>
+          <p>{decisionStats.go} go / {decisionStats.review + decisionStats.hold} review-or-hold checkpoints</p>
+        </article>
+        <article>
+          <GitBranch size={16} />
+          <span>Branches</span>
+          <strong>{contingencyBranches.length} branches</strong>
+          <p>{contingencyStats.emergency} emergency path in the contingency package</p>
         </article>
       </div>
 
@@ -621,6 +758,181 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
                 <textarea
                   value={point.notes}
                   onChange={(event) => updateTrajectoryPoint(point.id, { notes: event.target.value })}
+                />
+              </label>
+            </article>
+          ))}
+        </div>
+
+        <div className="manual-section-title">
+          <Route size={16} />
+          <span>Route Geometry</span>
+        </div>
+        <div className="route-segment-grid">
+          {routeSegments.map((segment) => (
+            <article className="route-segment-card" key={segment.id}>
+              <div>
+                <strong>{segment.label}</strong>
+                <span>{segment.distanceKm} km / {segment.durationMin} min</span>
+              </div>
+              <p>{segment.from} to {segment.to}</p>
+              <dl>
+                <div>
+                  <dt>Heading</dt>
+                  <dd>{segment.headingChangeDeg}</dd>
+                </div>
+                <div>
+                  <dt>Altitude</dt>
+                  <dd>{segment.altitudeDeltaM}</dd>
+                </div>
+                <div>
+                  <dt>Sensor</dt>
+                  <dd>{segment.sensorChain}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+
+        <div className="manual-section-title">
+          <ListChecks size={16} />
+          <span>Decision Gates</span>
+          <div className="section-actions">
+            <button type="button" onClick={addDecisionGate}>
+              <Plus size={14} />
+              Add gate
+            </button>
+          </div>
+        </div>
+        <div className="manual-array-list">
+          {decisionGates.map((gate, index) => (
+            <article className="manual-array-card" key={gate.id}>
+              <div className="manual-array-head">
+                <strong>{String(index + 1).padStart(2, "0")}</strong>
+                <input
+                  aria-label={`Decision gate ${index + 1} label`}
+                  value={gate.label}
+                  onChange={(event) => updateDecisionGate(gate.id, { label: event.target.value })}
+                />
+                <button
+                  aria-label={`Remove decision gate ${index + 1}`}
+                  disabled={decisionGates.length <= 1}
+                  onClick={() => removeDecisionGate(gate.id)}
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div className="manual-array-grid">
+                <label>
+                  ETA +min
+                  <input
+                    type="number"
+                    value={gate.etaOffsetMin}
+                    onChange={(event) => updateDecisionGate(gate.id, { etaOffsetMin: Number(event.target.value) })}
+                  />
+                </label>
+                <label>
+                  Owner
+                  <input value={gate.owner} onChange={(event) => updateDecisionGate(gate.id, { owner: event.target.value })} />
+                </label>
+                <label>
+                  Status
+                  <select
+                    value={gate.status}
+                    onChange={(event) => updateDecisionGate(gate.id, { status: event.target.value as DecisionGateStatus })}
+                  >
+                    {decisionGateStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label>
+                Condition
+                <textarea
+                  value={gate.condition}
+                  onChange={(event) => updateDecisionGate(gate.id, { condition: event.target.value })}
+                />
+              </label>
+              <label>
+                Required action
+                <textarea
+                  value={gate.action}
+                  onChange={(event) => updateDecisionGate(gate.id, { action: event.target.value })}
+                />
+              </label>
+            </article>
+          ))}
+        </div>
+
+        <div className="manual-section-title">
+          <GitBranch size={16} />
+          <span>Contingency Branches</span>
+          <div className="section-actions">
+            <button type="button" onClick={addContingencyBranch}>
+              <Plus size={14} />
+              Add branch
+            </button>
+          </div>
+        </div>
+        <div className="manual-array-list">
+          {contingencyBranches.map((branch, index) => (
+            <article className="manual-array-card" key={branch.id}>
+              <div className="manual-array-head">
+                <strong>{String(index + 1).padStart(2, "0")}</strong>
+                <input
+                  aria-label={`Contingency branch ${index + 1} trigger`}
+                  value={branch.trigger}
+                  onChange={(event) => updateContingencyBranch(branch.id, { trigger: event.target.value })}
+                />
+                <button
+                  aria-label={`Remove contingency branch ${index + 1}`}
+                  disabled={contingencyBranches.length <= 1}
+                  onClick={() => removeContingencyBranch(branch.id)}
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div className="manual-array-grid">
+                <label>
+                  Owner
+                  <input
+                    value={branch.owner}
+                    onChange={(event) => updateContingencyBranch(branch.id, { owner: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Priority
+                  <select
+                    value={branch.priority}
+                    onChange={(event) =>
+                      updateContingencyBranch(branch.id, { priority: event.target.value as ContingencyPriority })
+                    }
+                  >
+                    {contingencyPriorities.map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label>
+                Branch action
+                <textarea
+                  value={branch.action}
+                  onChange={(event) => updateContingencyBranch(branch.id, { action: event.target.value })}
+                />
+              </label>
+              <label>
+                Notes
+                <textarea
+                  value={branch.notes}
+                  onChange={(event) => updateContingencyBranch(branch.id, { notes: event.target.value })}
                 />
               </label>
             </article>
@@ -870,6 +1182,16 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
               <span>Setup ready</span>
               <strong>{setupStats.ready}/{analysis.originalPlan.setupItems.length}</strong>
             </article>
+            <article>
+              <ListChecks size={16} />
+              <span>Decision gates</span>
+              <strong>{analysis.originalPlan.decisionGates.length}</strong>
+            </article>
+            <article>
+              <GitBranch size={16} />
+              <span>Contingencies</span>
+              <strong>{analysis.originalPlan.contingencyBranches.length}</strong>
+            </article>
           </div>
           <ul>
             {[...analysis.agentAnalysis.strengths, ...analysis.agentAnalysis.recommendedModifications].slice(0, 5).map((item) => (
@@ -904,6 +1226,36 @@ function summarizeRoute(points: ManualTrajectoryPoint[]) {
   };
 }
 
+function buildRouteSegments(points: ManualTrajectoryPoint[]) {
+  const sorted = points
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+    .slice()
+    .sort((a, b) => a.etaOffsetMin - b.etaOffsetMin);
+
+  return sorted.slice(1).map((point, index) => {
+    const previous = sorted[index];
+    const distanceKm = distanceKmBetween(previous.lat, previous.lng, point.lat, point.lng);
+    const durationMin = Math.max(0, point.etaOffsetMin - previous.etaOffsetMin);
+    const headingChange = normalizeHeadingDelta(point.headingDeg - previous.headingDeg);
+    const altitudeDelta = Math.round(point.altitudeM - previous.altitudeM);
+    const sensorChain = previous.sensorMode === point.sensorMode
+      ? point.sensorMode
+      : `${previous.sensorMode} -> ${point.sensorMode}`;
+
+    return {
+      id: `${previous.id}-${point.id}`,
+      label: `Leg ${String(index + 1).padStart(2, "0")}`,
+      from: previous.label,
+      to: point.label,
+      distanceKm: distanceKm.toFixed(1),
+      durationMin,
+      headingChangeDeg: `${headingChange > 0 ? "+" : ""}${headingChange} deg`,
+      altitudeDeltaM: `${altitudeDelta > 0 ? "+" : ""}${altitudeDelta} m`,
+      sensorChain
+    };
+  });
+}
+
 function summarizeSetup(items: ManualSetupItem[]) {
   return items.reduce(
     (stats, item) => {
@@ -911,6 +1263,26 @@ function summarizeSetup(items: ManualSetupItem[]) {
       return stats;
     },
     { ready: 0, pending: 0, blocked: 0 } as Record<SetupStatus, number>
+  );
+}
+
+function summarizeDecisionGates(gates: ManualDecisionGate[]) {
+  return gates.reduce(
+    (stats, gate) => {
+      stats[gate.status] += 1;
+      return stats;
+    },
+    { go: 0, hold: 0, review: 0, abort: 0 } as Record<DecisionGateStatus, number>
+  );
+}
+
+function summarizeContingencies(branches: ManualContingencyBranch[]) {
+  return branches.reduce(
+    (stats, branch) => {
+      stats[branch.priority] += 1;
+      return stats;
+    },
+    { primary: 0, secondary: 0, emergency: 0 } as Record<ContingencyPriority, number>
   );
 }
 
@@ -922,6 +1294,11 @@ function distanceKmBetween(latA: number, lngA: number, latB: number, lngB: numbe
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRadians(latA)) * Math.cos(toRadians(latB)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function normalizeHeadingDelta(value: number) {
+  const normalized = ((value + 540) % 360) - 180;
+  return Math.round(normalized);
 }
 
 function toRadians(value: number) {

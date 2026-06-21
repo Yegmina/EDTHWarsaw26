@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   BarChart3,
   CheckCircle2,
+  Copy,
   ClipboardList,
   Database,
   Download,
@@ -27,7 +28,7 @@ type AnalysisDashboardProps = {
   postStrikeData: PostStrikeData;
 };
 
-type DashboardView = "summary" | "effectiveness" | "lessons" | "parameters" | "audit";
+type DashboardView = "summary" | "effectiveness" | "lessons" | "parameters" | "audit" | "report";
 
 type KeyMetric = {
   label: string;
@@ -82,9 +83,10 @@ const reportStatusRank: Record<SourceStatus, number> = {
 
 export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDashboardProps) {
   const [activeView, setActiveView] = useState<DashboardView>("summary");
+  const [copyStatus, setCopyStatus] = useState("Copy");
 
   const report = useMemo(() => buildDashboardReport(recommendation, postStrikeData), [recommendation, postStrikeData]);
-  const { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload } = report;
+  const { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload, markdownReport } = report;
 
   function handleDownloadReport() {
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
@@ -96,6 +98,29 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function handleDownloadMarkdown() {
+    const blob = new Blob([markdownReport], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `analysis-report-${postStrikeData.id}.md`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleCopyMarkdown() {
+    try {
+      await navigator.clipboard.writeText(markdownReport);
+      setCopyStatus("Copied");
+      window.setTimeout(() => setCopyStatus("Copy"), 1800);
+    } catch {
+      setCopyStatus("Copy failed");
+      window.setTimeout(() => setCopyStatus("Copy"), 1800);
+    }
   }
 
   return (
@@ -120,7 +145,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           </div>
           <button className="download-report" onClick={handleDownloadReport} type="button">
             <Download size={14} />
-            Export
+            JSON
+          </button>
+          <button className="download-report" onClick={handleDownloadMarkdown} type="button">
+            <FileText size={14} />
+            Markdown
           </button>
         </div>
       </div>
@@ -161,6 +190,13 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           >
             <ClipboardList size={16} />
             Evidence Audit
+          </button>
+          <button
+            className={`nav-item ${activeView === "report" ? "nav-active" : ""}`}
+            onClick={() => setActiveView("report")}
+          >
+            <FileText size={16} />
+            Handoff Report
           </button>
         </div>
 
@@ -388,14 +424,43 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
               </div>
             </div>
           )}
+
+          {activeView === "report" && (
+            <div className="report-view">
+              <div className="report-header">
+                <h3>
+                  <FileText size={20} />
+                  Handoff Report
+                </h3>
+                <div>
+                  <button className="download-report" onClick={handleCopyMarkdown} type="button">
+                    <Copy size={14} />
+                    {copyStatus}
+                  </button>
+                  <button className="download-report" onClick={handleDownloadMarkdown} type="button">
+                    <Download size={14} />
+                    Download
+                  </button>
+                </div>
+              </div>
+
+              <div className="report-preview" aria-label="Markdown handoff report preview">
+                <pre>{markdownReport}</pre>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <style jsx>{`
         .pipeline-panel {
+          position: relative;
           background:
+            linear-gradient(90deg, rgba(117, 240, 200, 0.035) 1px, transparent 1px),
+            linear-gradient(rgba(117, 240, 200, 0.03) 1px, transparent 1px),
             linear-gradient(135deg, rgba(117, 240, 200, 0.06), transparent 34%),
             var(--panel);
+          background-size: 40px 40px, 40px 40px, auto, auto;
           border: 1px solid var(--line);
           border-radius: 0;
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.018), 0 18px 44px rgba(0, 0, 0, 0.22);
@@ -480,7 +545,9 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
-          background: rgba(5, 7, 6, 0.36);
+          background:
+            linear-gradient(180deg, rgba(5, 7, 6, 0.7), rgba(5, 7, 6, 0.38)),
+            rgba(5, 7, 6, 0.36);
         }
 
         .nav-item {
@@ -512,6 +579,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
 
         .dashboard-content {
           padding: 1.5rem;
+          background:
+            linear-gradient(90deg, rgba(117, 240, 200, 0.024) 1px, transparent 1px),
+            linear-gradient(rgba(117, 240, 200, 0.02) 1px, transparent 1px),
+            rgba(5, 7, 6, 0.24);
+          background-size: 32px 32px, 32px 32px, auto;
         }
 
         .executive-summary {
@@ -522,7 +594,8 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
         .effectiveness-view h3,
         .lessons-view h3,
         .parameters-view h3,
-        .audit-view h3 {
+        .audit-view h3,
+        .report-view h3 {
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -552,6 +625,7 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           background: rgba(5, 7, 6, 0.42);
           border: 1px solid rgba(117, 240, 200, 0.12);
           border-radius: 8px;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.018);
         }
 
         .key-metric {
@@ -896,6 +970,51 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           color: #75f0c8;
         }
 
+        .report-view {
+          display: grid;
+          gap: 1rem;
+        }
+
+        .report-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+
+        .report-header h3 {
+          margin-bottom: 0;
+        }
+
+        .report-header > div {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 0.5rem;
+        }
+
+        .report-preview {
+          max-height: 680px;
+          overflow: auto;
+          border: 1px solid rgba(117, 240, 200, 0.14);
+          border-radius: 8px;
+          background:
+            linear-gradient(rgba(117, 240, 200, 0.025) 50%, transparent 50%),
+            rgba(5, 7, 6, 0.5);
+          background-size: 100% 4px, auto;
+          padding: 1rem;
+        }
+
+        .report-preview pre {
+          margin: 0;
+          color: #d8e7e1;
+          font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+          font-size: 0.8rem;
+          line-height: 1.58;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+
         @media (max-width: 900px) {
           .panel-header {
             align-items: flex-start;
@@ -917,6 +1036,11 @@ export function AnalysisDashboard({ recommendation, postStrikeData }: AnalysisDa
           .dashboard-nav {
             border-right: 0;
             border-bottom: 1px solid rgba(117, 240, 200, 0.14);
+          }
+
+          .report-header {
+            align-items: flex-start;
+            flex-direction: column;
           }
         }
       `}</style>
@@ -1017,8 +1141,95 @@ function buildDashboardReport(recommendation: StrikeRecommendation, postStrikeDa
     statusCounts,
     evidenceScore
   };
+  const markdownReport = buildMarkdownReport({
+    recommendation,
+    postStrikeData,
+    conclusions,
+    keyMetrics,
+    objectives,
+    timeline,
+    statusCounts,
+    evidenceScore
+  });
 
-  return { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload };
+  return { conclusions, keyMetrics, objectives, timeline, statusCounts, evidenceScore, exportPayload, markdownReport };
+}
+
+function buildMarkdownReport({
+  recommendation,
+  postStrikeData,
+  conclusions,
+  keyMetrics,
+  objectives,
+  timeline,
+  statusCounts,
+  evidenceScore
+}: {
+  recommendation: StrikeRecommendation;
+  postStrikeData: PostStrikeData;
+  conclusions: AnalysisConclusion;
+  keyMetrics: KeyMetric[];
+  objectives: Objective[];
+  timeline: TimelineItem[];
+  statusCounts: Record<SourceStatus, number>;
+  evidenceScore: { delta: number; blended: number };
+}) {
+  const sourceReports = postStrikeData.sourceReports
+    .slice()
+    .sort((a, b) => reportStatusRank[b.status] - reportStatusRank[a.status])
+    .map((report) => `- **${report.label}** (${report.type}, ${report.status}, ${report.confidence}%): ${report.summary}`)
+    .join("\n");
+
+  return [
+    `# AeroRozum Assessment Report`,
+    "",
+    `Generated: ${new Date(conclusions.timestamp).toISOString()}`,
+    `Recommendation ID: ${recommendation.id}`,
+    `Evidence ID: ${postStrikeData.id}`,
+    "",
+    "## Executive Summary",
+    "",
+    conclusions.summary,
+    "",
+    "## Key Metrics",
+    "",
+    ...keyMetrics.map((metric) => `- **${metric.label}:** ${metric.value} - ${metric.detail}`),
+    `- **Planning confidence:** ${recommendation.confidenceScore}%`,
+    `- **Evidence confidence:** ${postStrikeData.confidenceScore}%`,
+    `- **Blended confidence:** ${evidenceScore.blended}%`,
+    `- **Confidence delta:** ${evidenceScore.delta >= 0 ? "+" : ""}${evidenceScore.delta}%`,
+    "",
+    "## Objective Review",
+    "",
+    ...objectives.map((objective) => `- **${objective.label}:** ${objective.value} - ${objective.detail}`),
+    "",
+    "## Timeline",
+    "",
+    ...timeline.map((item) => `- **${item.time}:** ${item.label} - ${item.detail}`),
+    "",
+    "## Evidence Audit",
+    "",
+    `Source posture: ${statusCounts.confirmed} confirmed, ${statusCounts.supporting} supporting, ${statusCounts.pending} pending, ${statusCounts.conflicting} conflicting.`,
+    "",
+    sourceReports || "- No source reports submitted.",
+    "",
+    "## Open Gaps",
+    "",
+    markdownList(postStrikeData.gaps),
+    "",
+    "## Next Review Actions",
+    "",
+    markdownList(postStrikeData.nextReviewActions),
+    "",
+    "## Lessons Learned",
+    "",
+    markdownList(conclusions.lessonsLearned),
+    "",
+    "## Parameter Adjustments",
+    "",
+    markdownList(conclusions.parameterAdjustments),
+    ""
+  ].join("\n");
 }
 
 function buildEffectivenessFactors(
@@ -1128,6 +1339,10 @@ function titleCase(value: string) {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
+}
+
+function markdownList(items: string[]) {
+  return items.length ? items.map((item) => `- ${item}`).join("\n") : "- None submitted.";
 }
 
 function priorityLabel(index: number) {
