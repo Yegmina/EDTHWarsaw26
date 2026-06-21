@@ -18,6 +18,7 @@ import {
   Volume2
 } from "lucide-react";
 import type { PostStrikeData, StrikeRecommendation } from "@/app/types/pipeline";
+import { VideoDamageAssessment, type VideoAssessmentSummary } from "./VideoDamageAssessment";
 
 type PostStrikeAnalysisProps = {
   recommendation: StrikeRecommendation;
@@ -141,6 +142,16 @@ export function PostStrikeAnalysis({ recommendation, onAnalysisComplete }: PostS
     setResult(null);
   }
 
+  function applyVideoAssessment(summary: VideoAssessmentSummary) {
+    updateSource("source-video", {
+      label: "Video damage assessment",
+      status: summary.eventCount ? "confirmed" : "supporting",
+      confidence: summary.confidence,
+      summary: summary.summary
+    });
+    setAssessmentConfidence(String(Math.max(Number(assessmentConfidence) || 0, summary.confidence)));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -196,6 +207,10 @@ export function PostStrikeAnalysis({ recommendation, onAnalysisComplete }: PostS
           <span>{recommendation.selectedParameters.timing}</span>
         </div>
       </div>
+
+      <form className="planner-form" onSubmit={(event) => event.preventDefault()}>
+        <VideoDamageAssessment onAssessmentComplete={applyVideoAssessment} />
+      </form>
 
       <form className="planner-form" onSubmit={handleSubmit}>
         <div className="evidence-section-title">
