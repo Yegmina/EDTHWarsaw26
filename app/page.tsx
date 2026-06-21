@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BarChart3,
   Brain,
+  Camera,
   Crosshair,
   Database,
   Download,
@@ -134,6 +135,7 @@ export default function Home() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionStatus, setSessionStatus] = useState("Session not loaded");
+  const [presentationMode, setPresentationMode] = useState(false);
 
   // Stage 0 state
   const [rawText, setRawText] = useState("");
@@ -228,6 +230,17 @@ export default function Home() {
       setSessionStatus("Autosave failed");
     }
   }, [sessionReady, sessionSnapshot]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPresentationMode(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const inputStats = useMemo(() => {
     const words = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
@@ -401,7 +414,7 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${presentationMode ? "presentation-mode" : ""}`}>
       <section className="command-bar">
         <div>
           <div className="eyebrow">AeroRozum / Warsaw26</div>
@@ -483,6 +496,16 @@ export default function Home() {
             type="file"
           />
         </div>
+        <button
+          type="button"
+          aria-label={presentationMode ? "Exit capture mode" : "Enter capture mode"}
+          className={`capture-toggle ${presentationMode ? "capture-active" : ""}`}
+          onClick={() => setPresentationMode((current) => !current)}
+          title={presentationMode ? "Exit capture mode" : "Capture mode"}
+        >
+          <Camera size={15} />
+          <span>{presentationMode ? "Exit capture" : "Capture"}</span>
+        </button>
       </section>
 
       {/* Stage 0: Current-State Intake */}

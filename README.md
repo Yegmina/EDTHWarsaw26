@@ -53,6 +53,8 @@ The command bar includes session controls:
 
 The exported session captures Stage 0 intake, map range overlays, active stage, planning recommendation, manual-plan analysis, post-strike evidence, and final analysis inputs.
 
+Use the Capture button in the top bar to hide session controls and switch the interface into a clean presentation layout for screenshots.
+
 ## Requirements
 
 - Node.js 20+

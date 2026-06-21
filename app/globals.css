@@ -137,6 +137,56 @@ h1 {
   display: none;
 }
 
+.capture-toggle {
+  min-height: 36px;
+  border-radius: 8px;
+  background: rgba(117, 240, 200, 0.1);
+  color: var(--green);
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.capture-toggle:hover {
+  background: rgba(117, 240, 200, 0.16);
+}
+
+.capture-toggle.capture-active {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 7000;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-color: rgba(117, 240, 200, 0.3);
+  background: rgba(5, 7, 6, 0.46);
+  color: rgba(117, 240, 200, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.capture-toggle.capture-active span {
+  display: none;
+}
+
+.presentation-mode {
+  padding-top: 20px;
+}
+
+.presentation-mode .command-bar {
+  align-items: center;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+}
+
+.presentation-mode .session-strip,
+.presentation-mode .status-strip {
+  display: none;
+}
+
+.presentation-mode .pipeline-stages {
+  margin-left: auto;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(360px, 0.9fr) minmax(460px, 1.3fr) minmax(340px, 0.85fr);
