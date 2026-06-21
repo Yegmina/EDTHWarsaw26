@@ -44,6 +44,20 @@ export type StrikeRecommendation = {
   };
 };
 
+export type IntakePlanningSeed = {
+  available: boolean;
+  sourceTitle: string;
+  targetSummary: string;
+  areaName: string;
+  coordinates: Coordinates;
+  priority: "critical" | "high" | "medium" | "low";
+  constraints: string;
+  brief: string;
+  confidence: string;
+  observationCount: number;
+  gapCount: number;
+};
+
 export type ManualPlanInput = {
   planTitle: string;
   targetDescription: string;

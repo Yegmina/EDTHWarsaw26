@@ -25,6 +25,7 @@ import { StrikePlanner } from "./components/StrikePlanner";
 import { ManualPlanInput } from "./components/ManualPlanInput";
 import { PostStrikeAnalysis } from "./components/PostStrikeAnalysis";
 import { AnalysisDashboard } from "./components/AnalysisDashboard";
+import type { IntakePlanningSeed } from "./types/pipeline";
 
 const MapPanel = dynamic(() => import("./components/MapPanel").then((mod) => mod.MapPanel), {
   ssr: false,
@@ -116,6 +117,7 @@ export default function Home() {
   const [rangeRings, setRangeRings] = useState<RangeRing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lastAnalyzedText, setLastAnalyzedText] = useState("");
 
   // Pipeline state
   const [activeStage, setActiveStage] = useState<PipelineStage>("stage-0");
@@ -130,6 +132,40 @@ export default function Home() {
     const words = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
     return { chars: rawText.length, words };
   }, [rawText]);
+
+  const intakePlanningSeed = useMemo<IntakePlanningSeed>(() => {
+    const currentText = rawText.trim();
+    const hasFreshAnalysis = Boolean(currentText) && lastAnalyzedText === currentText;
+    const firstLayer = analysis.mapLayers[0];
+    const sourceClaim =
+      analysis.observations.find((observation) => observation.label !== "Awaiting source claim") ??
+      analysis.observations[0];
+    const sourceTitleLabel = sourceTitle.trim() || "Stage 0 source packet";
+    const constraints = [
+      ...analysis.sourceGaps,
+      ...analysis.verificationQuestions,
+      analysis.brief ? `Analyst brief: ${analysis.brief}` : ""
+    ]
+      .filter(Boolean)
+      .slice(0, 8)
+      .join("\n");
+
+    return {
+      available: hasFreshAnalysis,
+      sourceTitle: sourceTitleLabel,
+      targetSummary: sourceClaim?.label && sourceClaim.label !== "Awaiting source claim"
+        ? `${sourceTitleLabel}: ${sourceClaim.label}`
+        : "Stage 0 current-state claim review",
+      areaName: firstLayer?.label || sourceTitleLabel,
+      coordinates: firstLayer ? { lat: firstLayer.lat, lng: firstLayer.lng } : rangeAnchor,
+      priority: priorityFromConfidence(analysis.confidence),
+      constraints: constraints || "Stage 0 analysis did not include constraints.",
+      brief: compactText(analysis.brief, 240),
+      confidence: String(analysis.confidence || "unknown"),
+      observationCount: analysis.observations.filter((observation) => observation.label !== "Awaiting source claim").length,
+      gapCount: analysis.sourceGaps.length
+    };
+  }, [analysis, lastAnalyzedText, rangeAnchor, rawText, sourceTitle]);
 
   async function handleAnalyze(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -149,6 +185,7 @@ export default function Home() {
       }
 
       setAnalysis(body);
+      setLastAnalyzedText(rawText.trim());
       if (Array.isArray(body.mapLayers) && body.mapLayers[0]) {
         setRangeAnchor({ lat: body.mapLayers[0].lat, lng: body.mapLayers[0].lng });
       }
@@ -498,6 +535,7 @@ export default function Home() {
           <div className="dashboard-grid">
             {!manualPlanMode ? (
               <StrikePlanner 
+                intakeSeed={intakePlanningSeed}
                 onRecommendationComplete={(rec) => {
                   setStrikeRecommendation(rec);
                 }} 
@@ -659,4 +697,22 @@ function ArrowRight({ size = 16 }: { size?: number }) {
       <polyline points="12 5 19 12 12 19"/>
     </svg>
   );
+}
+
+function priorityFromConfidence(confidence: string): IntakePlanningSeed["priority"] {
+  if (confidence === "high") {
+    return "high";
+  }
+  if (confidence === "low") {
+    return "medium";
+  }
+  return "high";
+}
+
+function compactText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "No Stage 0 brief is available yet.";
+  }
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
 }

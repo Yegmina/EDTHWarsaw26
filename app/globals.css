@@ -1411,6 +1411,63 @@ ul {
   width: 100%;
 }
 
+.intake-seed-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 1.25rem 0;
+  border: 1px solid rgba(117, 240, 200, 0.16);
+  border-radius: 8px;
+  background: rgba(5, 7, 6, 0.5);
+  padding: 1rem;
+}
+
+.intake-seed-card > div:first-child,
+.intake-seed-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.intake-seed-card > div:first-child svg {
+  color: var(--green);
+}
+
+.intake-seed-card strong {
+  color: var(--text);
+}
+
+.intake-seed-card > div:first-child span,
+.intake-seed-meta span {
+  color: var(--muted);
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.intake-seed-card p {
+  color: #b7cbc2;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.intake-seed-card button {
+  justify-self: start;
+  border: 1px solid rgba(117, 240, 200, 0.34);
+  border-radius: 8px;
+  background: rgba(117, 240, 200, 0.1);
+  color: var(--green);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0.62rem 0.8rem;
+}
+
+.intake-seed-card button:hover {
+  background: rgba(117, 240, 200, 0.16);
+}
+
 .planner-form {
   display: grid;
   gap: 1rem;

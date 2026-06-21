@@ -1,14 +1,24 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { AlertTriangle, CheckCircle2, Crosshair, Loader2, Radar, Route, Shield } from "lucide-react";
-import type { StrikeRecommendation } from "@/app/types/pipeline";
+import { AlertTriangle, CheckCircle2, Crosshair, Database, Loader2, Radar, Route, Shield } from "lucide-react";
+import type { IntakePlanningSeed, StrikeRecommendation } from "@/app/types/pipeline";
 
 type StrikePlannerProps = {
+  intakeSeed?: IntakePlanningSeed;
   onRecommendationComplete: (recommendation: StrikeRecommendation) => void;
 };
 
-const defaultForm = {
+type PlannerForm = {
+  targetSummary: string;
+  areaName: string;
+  lat: string;
+  lng: string;
+  priority: "critical" | "high" | "medium" | "low";
+  constraints: string;
+};
+
+const defaultForm: PlannerForm = {
   targetSummary: "Priority logistics and communications node",
   areaName: "Northern sector reference area",
   lat: "55.7558",
@@ -17,7 +27,7 @@ const defaultForm = {
   constraints: "Dense air-defense coverage, uncertain weather ceiling, limited post-event imagery window"
 };
 
-export function StrikePlanner({ onRecommendationComplete }: StrikePlannerProps) {
+export function StrikePlanner({ intakeSeed, onRecommendationComplete }: StrikePlannerProps) {
   const [form, setForm] = useState(defaultForm);
   const [recommendation, setRecommendation] = useState<StrikeRecommendation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +72,23 @@ export function StrikePlanner({ onRecommendationComplete }: StrikePlannerProps) 
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function applyIntakeSeed() {
+    if (!intakeSeed?.available) {
+      return;
+    }
+
+    setForm({
+      targetSummary: intakeSeed.targetSummary,
+      areaName: intakeSeed.areaName,
+      lat: formatCoordinate(intakeSeed.coordinates.lat),
+      lng: formatCoordinate(intakeSeed.coordinates.lng),
+      priority: intakeSeed.priority,
+      constraints: intakeSeed.constraints
+    });
+    setRecommendation(null);
+    setError("");
+  }
+
   return (
     <section className="panel pipeline-card">
       <div className="panel-header">
@@ -71,6 +98,25 @@ export function StrikePlanner({ onRecommendationComplete }: StrikePlannerProps) 
         </div>
         <Crosshair size={20} />
       </div>
+
+      {intakeSeed?.available ? (
+        <div className="intake-seed-card">
+          <div>
+            <Database size={16} />
+            <strong>Stage 0 intake packet</strong>
+            <span>{intakeSeed.confidence} confidence</span>
+          </div>
+          <p>{intakeSeed.brief}</p>
+          <div className="intake-seed-meta">
+            <span>{intakeSeed.sourceTitle}</span>
+            <span>{intakeSeed.observationCount} observations</span>
+            <span>{intakeSeed.gapCount} gaps</span>
+          </div>
+          <button type="button" onClick={applyIntakeSeed}>
+            Apply intake packet
+          </button>
+        </div>
+      ) : null}
 
       <form className="planner-form" onSubmit={handleSubmit}>
         <label>
@@ -163,4 +209,8 @@ export function StrikePlanner({ onRecommendationComplete }: StrikePlannerProps) 
       ) : null}
     </section>
   );
+}
+
+function formatCoordinate(value: number) {
+  return Number.isFinite(value) ? value.toFixed(4) : "0.0000";
 }
