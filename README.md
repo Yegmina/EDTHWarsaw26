@@ -8,7 +8,7 @@ AeroRozum Warsaw26 is a Next.js prototype for a staged intelligence-analysis and
   Submit a source title, URL, optional image URL, and raw current-state text. The server-side LLM endpoint extracts a concrete analyst brief, observations, source gaps, verification questions, confidence, and map review layers.
 
 - **Stage 1: Planning**  
-  Generate an automated planning recommendation from Stage 0 or enter a detailed manual package. Manual mode supports checkpoint trajectory arrays, route geometry, timing, heading, sensor mode, handoffs, decision gates, contingency branches, setup checklist items, and post-event collection windows.
+  Generate an automated planning recommendation from Stage 0 or enter a detailed manual package. Manual mode supports checkpoint trajectory arrays, route geometry, readiness scoring, timeline review, JSON package export, timing, heading, sensor mode, handoffs, decision gates, contingency branches, setup checklist items, and post-event collection windows.
 
 - **Stage 2: Evidence Fusion**  
   Review and edit a structured evidence matrix across video, public camera, audio, satellite, operator, and other sources. A playable video assessment panel can upload local RGB, thermal, or mixed footage, run frame-delta detection across the clip, draw live boxes over detected event windows, and push the result into the video evidence source.

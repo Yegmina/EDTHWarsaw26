@@ -6,6 +6,8 @@ import {
   Brain,
   CheckCircle2,
   ClipboardCheck,
+  Download,
+  Gauge,
   GitBranch,
   ListChecks,
   Loader2,
@@ -34,6 +36,31 @@ import type {
 
 type ManualPlanInputProps = {
   onPlanAnalyzed: (analysis: AgentAnalyzedPlan) => void;
+};
+
+type PlanningTimelineItem = {
+  id: string;
+  type: "checkpoint" | "gate" | "collection";
+  etaOffsetMin: number;
+  label: string;
+  detail: string;
+  tone: "success" | "warning" | "info";
+};
+
+type ReadinessTone = "ready" | "review" | "blocked";
+
+type ReadinessFinding = {
+  label: string;
+  value: string;
+  detail: string;
+};
+
+type ManualReadinessSummary = {
+  score: number;
+  tone: ReadinessTone;
+  label: string;
+  summary: string;
+  findings: ReadinessFinding[];
 };
 
 const initialTrajectory: ManualTrajectoryPoint[] = [
@@ -272,6 +299,48 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
   const setupStats = useMemo(() => summarizeSetup(setupItems), [setupItems]);
   const decisionStats = useMemo(() => summarizeDecisionGates(decisionGates), [decisionGates]);
   const contingencyStats = useMemo(() => summarizeContingencies(contingencyBranches), [contingencyBranches]);
+  const planningTimeline = useMemo(
+    () => buildPlanningTimeline(trajectory, decisionGates, collectionWindows),
+    [collectionWindows, decisionGates, trajectory]
+  );
+  const readiness = useMemo(
+    () => summarizeManualReadiness({
+      trajectory,
+      setupItems,
+      collectionWindows,
+      decisionGates,
+      contingencyBranches
+    }),
+    [collectionWindows, contingencyBranches, decisionGates, setupItems, trajectory]
+  );
+  const manualPayload = useMemo<ManualPlanPayload>(
+    () => ({
+      planTitle: form.planTitle,
+      targetDescription: form.targetDescription,
+      coordinates: {
+        lat: Number(form.lat),
+        lng: Number(form.lng)
+      },
+      approachStrategy: form.approachStrategy,
+      timingConsiderations: form.timingConsiderations,
+      adAvoidanceStrategy: form.adAvoidanceStrategy,
+      environmentalNotes: form.environmentalNotes,
+      additionalContext: form.additionalContext,
+      operatorName: form.operatorName,
+      trajectory,
+      setupItems,
+      collectionWindows,
+      decisionGates,
+      contingencyBranches,
+      assetPackage: form.assetPackage,
+      sensorTasking: form.sensorTasking,
+      commsPlan: form.commsPlan,
+      abortCriteria: form.abortCriteria,
+      fallbackPlan: form.fallbackPlan,
+      bdaCollectionPlan: form.bdaCollectionPlan
+    }),
+    [collectionWindows, contingencyBranches, decisionGates, form, setupItems, trajectory]
+  );
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -489,42 +558,36 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
     );
   }
 
+  function handleDownloadManualPackage() {
+    const exportedAt = new Date().toISOString();
+    downloadJson(
+      {
+        exportedAt,
+        package: manualPayload,
+        derived: {
+          routeStats,
+          routeSegments,
+          setupStats,
+          decisionStats,
+          contingencyStats,
+          readiness,
+          planningTimeline
+        }
+      },
+      `manual-plan-${slugify(form.planTitle)}-${exportedAt.replace(/[:.]/g, "-")}.json`
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setIsLoading(true);
 
-    const payload: ManualPlanPayload = {
-      planTitle: form.planTitle,
-      targetDescription: form.targetDescription,
-      coordinates: {
-        lat: Number(form.lat),
-        lng: Number(form.lng)
-      },
-      approachStrategy: form.approachStrategy,
-      timingConsiderations: form.timingConsiderations,
-      adAvoidanceStrategy: form.adAvoidanceStrategy,
-      environmentalNotes: form.environmentalNotes,
-      additionalContext: form.additionalContext,
-      operatorName: form.operatorName,
-      trajectory,
-      setupItems,
-      collectionWindows,
-      decisionGates,
-      contingencyBranches,
-      assetPackage: form.assetPackage,
-      sensorTasking: form.sensorTasking,
-      commsPlan: form.commsPlan,
-      abortCriteria: form.abortCriteria,
-      fallbackPlan: form.fallbackPlan,
-      bdaCollectionPlan: form.bdaCollectionPlan
-    };
-
     try {
       const response = await fetch("/api/manual-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(manualPayload)
       });
       const body = await response.json();
       if (!response.ok) {
@@ -546,10 +609,22 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
           <span className="panel-kicker">Stage 1</span>
           <h2>Manual Plan Input</h2>
         </div>
-        <Brain size={20} />
+        <div className="manual-header-actions">
+          <button type="button" onClick={handleDownloadManualPackage}>
+            <Download size={15} />
+            Export package
+          </button>
+          <Brain size={20} />
+        </div>
       </div>
 
       <div className="manual-overview-grid">
+        <article className={`readiness-card readiness-${readiness.tone}`}>
+          <Gauge size={16} />
+          <span>Readiness</span>
+          <strong>{readiness.score}%</strong>
+          <p>{readiness.label}</p>
+        </article>
         <article>
           <Route size={16} />
           <span>Trajectory</span>
@@ -586,6 +661,45 @@ export function ManualPlanInput({ onPlanAnalyzed }: ManualPlanInputProps) {
           <strong>{contingencyBranches.length} branches</strong>
           <p>{contingencyStats.emergency} emergency path in the contingency package</p>
         </article>
+      </div>
+
+      <div className="readiness-board">
+        <section className="readiness-score-panel">
+          <div className={`readiness-score-ring readiness-${readiness.tone}`}>
+            <strong>{readiness.score}</strong>
+            <span>READINESS</span>
+          </div>
+          <div className="readiness-bar" aria-label={`Manual package readiness ${readiness.score}%`}>
+            <span style={{ width: `${readiness.score}%` }} />
+          </div>
+          <p>{readiness.summary}</p>
+        </section>
+
+        <section className="readiness-findings">
+          {readiness.findings.map((finding) => (
+            <article key={finding.label}>
+              <span>{finding.label}</span>
+              <strong>{finding.value}</strong>
+              <p>{finding.detail}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="planning-timeline">
+          <div>
+            <Route size={16} />
+            <span>Planning Timeline</span>
+          </div>
+          <div className="planning-timeline-list">
+            {planningTimeline.map((item) => (
+              <article className={`timeline-chip timeline-${item.tone}`} key={item.id}>
+                <span>T+{item.etaOffsetMin}m</span>
+                <strong>{item.label}</strong>
+                <p>{item.detail}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
 
       <form className="planner-form" onSubmit={handleSubmit}>
@@ -1256,6 +1370,116 @@ function buildRouteSegments(points: ManualTrajectoryPoint[]) {
   });
 }
 
+function buildPlanningTimeline(
+  trajectory: ManualTrajectoryPoint[],
+  decisionGates: ManualDecisionGate[],
+  collectionWindows: ManualCollectionWindow[]
+): PlanningTimelineItem[] {
+  const checkpointItems: PlanningTimelineItem[] = trajectory.map((point) => ({
+    id: `checkpoint-${point.id}`,
+    type: "checkpoint",
+    etaOffsetMin: point.etaOffsetMin,
+    label: point.label,
+    detail: `${point.action} / ${point.sensorMode} / ${point.handoff || "handoff pending"}`,
+    tone: point.sensorMode === "none" ? "info" : "success"
+  }));
+
+  const gateItems: PlanningTimelineItem[] = decisionGates.map((gate) => ({
+    id: `gate-${gate.id}`,
+    type: "gate",
+    etaOffsetMin: gate.etaOffsetMin,
+    label: gate.label,
+    detail: `${gate.status.toUpperCase()} / ${gate.owner}`,
+    tone: gate.status === "go" ? "success" : gate.status === "abort" || gate.status === "hold" ? "warning" : "info"
+  }));
+
+  const collectionItems: PlanningTimelineItem[] = collectionWindows.map((window) => ({
+    id: `collection-${window.id}`,
+    type: "collection",
+    etaOffsetMin: window.offsetMin,
+    label: window.label,
+    detail: `${window.source} / ${window.durationMin} min`,
+    tone: window.source === "satellite" || window.source === "operator" ? "info" : "success"
+  }));
+
+  const typeOrder: Record<PlanningTimelineItem["type"], number> = {
+    checkpoint: 1,
+    gate: 2,
+    collection: 3
+  };
+
+  return [...checkpointItems, ...gateItems, ...collectionItems].sort(
+    (a, b) => a.etaOffsetMin - b.etaOffsetMin || typeOrder[a.type] - typeOrder[b.type]
+  );
+}
+
+function summarizeManualReadiness({
+  trajectory,
+  setupItems,
+  collectionWindows,
+  decisionGates,
+  contingencyBranches
+}: Pick<
+  ManualPlanPayload,
+  "trajectory" | "setupItems" | "collectionWindows" | "decisionGates" | "contingencyBranches"
+>): ManualReadinessSummary {
+  const setupStats = summarizeSetup(setupItems);
+  const decisionStats = summarizeDecisionGates(decisionGates);
+  const sourceTypes = new Set(collectionWindows.map((window) => window.source));
+  const routeHasTimedSensors = trajectory.some((point) => point.sensorMode !== "none" && point.etaOffsetMin >= 0);
+  const hasFallbackBranch = contingencyBranches.some(
+    (branch) => branch.priority === "primary" || branch.priority === "emergency"
+  );
+  const penalties = [
+    setupStats.pending * 5,
+    setupStats.blocked * 18,
+    decisionStats.review * 4,
+    decisionStats.hold * 7,
+    decisionStats.abort * 25,
+    routeHasTimedSensors ? 0 : 12,
+    sourceTypes.size >= 3 ? 0 : 8,
+    hasFallbackBranch ? 0 : 10,
+    trajectory.length >= 4 ? 0 : 8
+  ];
+  const score = clampScore(100 - penalties.reduce((total, penalty) => total + penalty, 0));
+  const tone: ReadinessTone = decisionStats.abort || setupStats.blocked ? "blocked" : score >= 82 ? "ready" : "review";
+  const label =
+    tone === "blocked" ? "Blocked item present" : tone === "ready" ? "Ready for review handoff" : "Review before handoff";
+  const summary =
+    tone === "ready"
+      ? "Package has route timing, sensor windows, decision gates, and fallback branches ready for handoff."
+      : "Package is usable, but unresolved gates, setup posture, or source coverage should be reviewed before handoff.";
+
+  return {
+    score,
+    tone,
+    label,
+    summary,
+    findings: [
+      {
+        label: "Setup posture",
+        value: `${setupStats.ready}/${setupItems.length}`,
+        detail: `${setupStats.pending} pending, ${setupStats.blocked} blocked`
+      },
+      {
+        label: "Gate posture",
+        value: `${decisionStats.go}/${decisionGates.length}`,
+        detail: `${decisionStats.review} review, ${decisionStats.hold} hold, ${decisionStats.abort} abort`
+      },
+      {
+        label: "Source coverage",
+        value: `${sourceTypes.size} types`,
+        detail: collectionWindows.map((window) => `${window.source} T+${window.offsetMin}m`).join(", ")
+      },
+      {
+        label: "Fallback posture",
+        value: `${contingencyBranches.length} branches`,
+        detail: `${contingencyBranches.filter((branch) => branch.priority === "emergency").length} emergency branch`
+      }
+    ]
+  };
+}
+
 function summarizeSetup(items: ManualSetupItem[]) {
   return items.reduce(
     (stats, item) => {
@@ -1284,6 +1508,30 @@ function summarizeContingencies(branches: ManualContingencyBranch[]) {
     },
     { primary: 0, secondary: 0, emergency: 0 } as Record<ContingencyPriority, number>
   );
+}
+
+function downloadJson(payload: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function slugify(value: string) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "package";
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function distanceKmBetween(latA: number, lngA: number, latB: number, lngB: number) {
