@@ -38,6 +38,7 @@ The Stage 2 video panel runs in the browser:
 - full-clip frame-delta analysis
 - live canvas boxes over the video during playback
 - event jump list with timestamps, class labels, and scores
+- optional server-side OpenAI interpretation of detector metadata and keyframe thumbnails
 - automatic evidence-matrix update with confidence and summary
 
 ## Session Handling
@@ -107,4 +108,5 @@ Stage 0 requires the key because it calls the server-side analysis endpoint. Man
 - Manual planning: `app/components/ManualPlanInput.tsx`
 - Evidence fusion: `app/components/PostStrikeAnalysis.tsx`
 - Video assessment: `app/components/VideoDamageAssessment.tsx`
+- Video interpretation API: `app/api/video-assessment/route.ts`
 - Final dashboard: `app/components/AnalysisDashboard.tsx`

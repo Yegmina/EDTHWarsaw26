@@ -1906,6 +1906,59 @@ ul {
   padding-top: 0.7rem;
 }
 
+.video-interpretation {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(117, 240, 200, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(117, 240, 200, 0.1), transparent 48%),
+    rgba(5, 7, 6, 0.5);
+  padding: 0.8rem;
+}
+
+.video-interpretation > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.video-interpretation strong {
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.video-interpretation span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.video-interpretation p,
+.video-interpretation li {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.video-interpretation ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.video-interpretation li {
+  border: 1px solid rgba(117, 240, 200, 0.14);
+  border-radius: 999px;
+  background: rgba(117, 240, 200, 0.08);
+  padding: 0.25rem 0.5rem;
+}
+
 .manual-section-title:first-child {
   border-top: 0;
   margin-top: 0;

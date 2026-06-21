@@ -36,6 +36,17 @@ type FrameSample = {
   luminance: number;
 };
 
+type VideoInterpretation = {
+  provider: "openai" | "local";
+  confidence: number;
+  damageLevel: "none-observed" | "possible" | "probable" | "severe" | "unknown";
+  summary: string;
+  observations: string[];
+  visualIndicators: string[];
+  uncertainties: string[];
+  recommendedReviewActions: string[];
+};
+
 const sampleWidth = 192;
 const sampleHeight = 108;
 
@@ -51,7 +62,9 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
   const [concurrency, setConcurrency] = useState("12");
   const [events, setEvents] = useState<DetectionEvent[]>([]);
   const [duration, setDuration] = useState(0);
+  const [interpretation, setInterpretation] = useState<VideoInterpretation | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isInterpreting, setIsInterpreting] = useState(false);
   const [error, setError] = useState("");
 
   const peakEvent = useMemo(
@@ -103,6 +116,7 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
     const file = event.target.files?.[0];
     setError("");
     setEvents([]);
+    setInterpretation(null);
 
     if (!file) {
       return;
@@ -137,17 +151,42 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
 
       setEvents(analysis.events);
       setDuration(analysis.duration);
-      onAssessmentComplete(buildAssessmentSummary(analysis.events, analysis.duration, sourceMode));
+      const localSummary = buildAssessmentSummary(analysis.events, analysis.duration, sourceMode, null);
+      onAssessmentComplete(localSummary);
+
+      const thumbnails = await captureEventThumbnails(videoUrl, analysis.events);
+      if (analysis.events.length) {
+        setIsInterpreting(true);
+        const aiAssessment = await requestVideoInterpretation({
+          sourceMode,
+          duration: analysis.duration,
+          events: analysis.events,
+          thumbnails
+        });
+        setInterpretation(aiAssessment);
+        onAssessmentComplete(buildAssessmentSummary(analysis.events, analysis.duration, sourceMode, aiAssessment));
+      } else {
+        const aiAssessment = await requestVideoInterpretation({
+          sourceMode,
+          duration: analysis.duration,
+          events: analysis.events,
+          thumbnails
+        });
+        setInterpretation(aiAssessment);
+        onAssessmentComplete(buildAssessmentSummary(analysis.events, analysis.duration, sourceMode, aiAssessment));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Video assessment failed.");
     } finally {
       setIsProcessing(false);
+      setIsInterpreting(false);
     }
   }
 
   function handleClear() {
     setEvents([]);
     setDuration(0);
+    setInterpretation(null);
     setError("");
   }
 
@@ -242,6 +281,11 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
               <span>Duration</span>
               <strong>{duration ? `${duration.toFixed(1)}s` : "pending"}</strong>
             </article>
+            <article>
+              <ScanLine size={15} />
+              <span>AI Brief</span>
+              <strong>{isInterpreting ? "running" : interpretation ? interpretation.provider : "pending"}</strong>
+            </article>
           </div>
 
           <div className="video-event-list">
@@ -266,6 +310,20 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
           </div>
 
           {eventProfile ? <p className="video-profile">{eventProfile}</p> : null}
+          {interpretation ? (
+            <div className="video-interpretation">
+              <div>
+                <strong>{interpretation.damageLevel.replace("-", " ")}</strong>
+                <span>{interpretation.provider} / {interpretation.confidence}%</span>
+              </div>
+              <p>{interpretation.summary}</p>
+              <ul>
+                {interpretation.visualIndicators.slice(0, 4).map((indicator) => (
+                  <li key={indicator}>{indicator}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
@@ -454,23 +512,178 @@ function mergeEvents(events: DetectionEvent[]) {
   return merged;
 }
 
-function buildAssessmentSummary(events: DetectionEvent[], duration: number, sourceMode: SourceMode): VideoAssessmentSummary {
+async function requestVideoInterpretation(payload: {
+  sourceMode: SourceMode;
+  duration: number;
+  events: DetectionEvent[];
+  thumbnails: string[];
+}): Promise<VideoInterpretation> {
+  try {
+    const response = await fetch("/api/video-assessment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      throw new Error(body.error || "Video interpretation failed.");
+    }
+
+    return normalizeVideoInterpretation(body, payload);
+  } catch {
+    return localInterpretation(payload.events, payload.duration, payload.sourceMode);
+  }
+}
+
+function normalizeVideoInterpretation(
+  value: Partial<VideoInterpretation>,
+  payload: {
+    sourceMode: SourceMode;
+    duration: number;
+    events: DetectionEvent[];
+  }
+): VideoInterpretation {
+  const fallback = localInterpretation(payload.events, payload.duration, payload.sourceMode);
+  const damageLevel = value.damageLevel;
+  return {
+    provider: value.provider === "openai" ? "openai" : "local",
+    confidence: boundedNumber(value.confidence, fallback.confidence, 0, 100),
+    damageLevel:
+      damageLevel === "none-observed" ||
+      damageLevel === "possible" ||
+      damageLevel === "probable" ||
+      damageLevel === "severe" ||
+      damageLevel === "unknown"
+        ? damageLevel
+        : fallback.damageLevel,
+    summary: typeof value.summary === "string" ? value.summary : fallback.summary,
+    observations: Array.isArray(value.observations) ? value.observations.map(String).filter(Boolean) : fallback.observations,
+    visualIndicators: Array.isArray(value.visualIndicators)
+      ? value.visualIndicators.map(String).filter(Boolean)
+      : fallback.visualIndicators,
+    uncertainties: Array.isArray(value.uncertainties) ? value.uncertainties.map(String).filter(Boolean) : fallback.uncertainties,
+    recommendedReviewActions: Array.isArray(value.recommendedReviewActions)
+      ? value.recommendedReviewActions.map(String).filter(Boolean)
+      : fallback.recommendedReviewActions
+  };
+}
+
+function localInterpretation(events: DetectionEvent[], duration: number, sourceMode: SourceMode): VideoInterpretation {
   const peak = events.slice().sort((a, b) => b.score - a.score)[0];
-  const confidence = peak
-    ? Math.min(96, Math.max(58, Math.round(56 + peak.score * 0.28 + Math.min(events.length, 12) * 2.2)))
-    : 44;
+  const profile = Array.from(new Set(events.map((event) => event.kind.replace("-", " "))));
+  const confidence = events.length ? Math.min(92, Math.max(52, Math.round(50 + (peak?.score ?? 0) * 0.32 + events.length * 2))) : 40;
+  const damageLevel: VideoInterpretation["damageLevel"] =
+    (peak?.score ?? 0) >= 82 && events.length >= 3
+      ? "severe"
+      : (peak?.score ?? 0) >= 62
+        ? "probable"
+        : events.length
+          ? "possible"
+          : "unknown";
+
+  return {
+    provider: "local",
+    confidence,
+    damageLevel,
+    summary: events.length
+      ? `${sourceMode.toUpperCase()} local review detected ${events.length} event windows over ${duration.toFixed(1)}s, led by ${peak?.kind.replace("-", " ")} at T+${peak?.time.toFixed(2)}s.`
+      : `${sourceMode.toUpperCase()} local review found no dominant fast-change event over ${duration.toFixed(1)}s.`,
+    observations: events
+      .slice(0, 5)
+      .map((event) => `T+${event.time.toFixed(2)}s ${event.kind.replace("-", " ")} scored ${event.score}%.`),
+    visualIndicators: profile.length ? profile : ["no dominant visible indicator"],
+    uncertainties: ["Frame-delta analysis cannot independently confirm physical damage."],
+    recommendedReviewActions: ["Preserve keyframes and compare with independent sources."]
+  };
+}
+
+async function captureEventThumbnails(videoUrl: string, events: DetectionEvent[]) {
+  if (!events.length) {
+    return [];
+  }
+
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.src = videoUrl;
+  await waitForVideoMetadata(video);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 480;
+  canvas.height = 270;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return [];
+  }
+
+  const selectedEvents = events.slice().sort((a, b) => b.score - a.score).slice(0, 4);
+  const thumbnails: string[] = [];
+
+  for (const event of selectedEvents) {
+    await seekVideo(video, event.time);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    drawEventBox(context, event, canvas.width, canvas.height);
+    thumbnails.push(canvas.toDataURL("image/jpeg", 0.72));
+  }
+
+  return thumbnails;
+}
+
+function drawEventBox(context: CanvasRenderingContext2D, event: DetectionEvent, width: number, height: number) {
+  const x = event.bbox.x * width;
+  const y = event.bbox.y * height;
+  const boxWidth = event.bbox.width * width;
+  const boxHeight = event.bbox.height * height;
+  context.strokeStyle = event.kind === "thermal-spike" ? "#f2b84b" : "#75f0c8";
+  context.lineWidth = 4;
+  context.strokeRect(x, y, boxWidth, boxHeight);
+  context.fillStyle = "rgba(5, 7, 6, 0.82)";
+  context.fillRect(x, Math.max(0, y - 26), Math.min(280, boxWidth + 80), 26);
+  context.fillStyle = event.kind === "thermal-spike" ? "#f2b84b" : "#75f0c8";
+  context.font = "13px Cascadia Mono, Consolas, monospace";
+  context.fillText(`${event.kind.replace("-", " ")} / ${event.score}%`, x + 7, Math.max(17, y - 8));
+}
+
+function buildAssessmentSummary(
+  events: DetectionEvent[],
+  duration: number,
+  sourceMode: SourceMode,
+  interpretation: VideoInterpretation | null
+): VideoAssessmentSummary {
+  const peak = events.slice().sort((a, b) => b.score - a.score)[0];
+  const confidence = interpretation
+    ? interpretation.confidence
+    : peak
+      ? Math.min(96, Math.max(58, Math.round(56 + peak.score * 0.28 + Math.min(events.length, 12) * 2.2)))
+      : 44;
   const profile = events.length
     ? Array.from(new Set(events.slice(0, 8).map((event) => event.kind.replace("-", " ")))).join(", ")
     : "no high-confidence delta events";
+  const interpretedSummary = interpretation
+    ? `${interpretation.provider.toUpperCase()} interpretation: ${interpretation.summary}`
+    : "";
 
   return {
     confidence,
     eventCount: events.length,
     peakScore: peak?.score ?? 0,
-    summary: events.length
-      ? `${sourceMode.toUpperCase()} video delta analysis detected ${events.length} event windows across ${duration.toFixed(1)}s; peak ${peak?.score ?? 0}% at T+${peak?.time.toFixed(2) ?? "0.00"}s; indicators: ${profile}.`
-      : `${sourceMode.toUpperCase()} video delta analysis found no dominant fast-change event across ${duration.toFixed(1)}s.`
+    summary: [
+      events.length
+        ? `${sourceMode.toUpperCase()} video delta analysis detected ${events.length} event windows across ${duration.toFixed(1)}s; peak ${peak?.score ?? 0}% at T+${peak?.time.toFixed(2) ?? "0.00"}s; indicators: ${profile}.`
+        : `${sourceMode.toUpperCase()} video delta analysis found no dominant fast-change event across ${duration.toFixed(1)}s.`,
+      interpretedSummary
+    ]
+      .filter(Boolean)
+      .join(" ")
   };
+}
+
+function boundedNumber(value: unknown, fallback: number, min: number, max: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.round(parsed))) : fallback;
 }
 
 function drawOverlay(video: HTMLVideoElement, canvas: HTMLCanvasElement, events: DetectionEvent[]) {
