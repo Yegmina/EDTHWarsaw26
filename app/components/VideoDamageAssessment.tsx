@@ -15,7 +15,7 @@ type VideoDamageAssessmentProps = {
 };
 
 type SourceMode = "rgb" | "thermal" | "mixed";
-type EventKind = "flash" | "thermal-spike" | "scene-change";
+type EventKind = "flash" | "thermal-spike" | "impact-detected";
 
 type DetectionEvent = {
   id: string;
@@ -78,7 +78,7 @@ export function VideoDamageAssessment({ onAssessmentComplete }: VideoDamageAsses
         acc[event.kind] += 1;
         return acc;
       },
-      { flash: 0, "thermal-spike": 0, "scene-change": 0 }
+      { flash: 0, "thermal-spike": 0, "impact-detected": 0 }
     );
 
     return Object.entries(counts)
@@ -464,9 +464,9 @@ function classifyEvent(sourceMode: SourceMode, brightRatio: number, luminanceDel
     return "flash";
   }
   if (changeRatio > 0.09) {
-    return "scene-change";
+    return "impact-detected";
   }
-  return "scene-change";
+  return "impact-detected";
 }
 
 function frameToSample(data: Uint8ClampedArray, time: number, sourceMode: SourceMode): FrameSample {

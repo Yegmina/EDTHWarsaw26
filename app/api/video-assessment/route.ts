@@ -120,7 +120,7 @@ function buildPrompt(payload: Required<VideoAssessmentRequest>) {
     '  "damageLevel": "none-observed" | "possible" | "probable" | "severe" | "unknown",',
     '  "summary": "2-4 sentence assessment",',
     '  "observations": ["specific visible observations"],',
-    '  "visualIndicators": ["flash, smoke, thermal bloom, scene change, etc"],',
+    '  "visualIndicators": ["flash, smoke, thermal bloom, impact detected, etc"],',
     '  "uncertainties": ["limitations and gaps"],',
     '  "recommendedReviewActions": ["non-operational review actions only"]',
     "}",

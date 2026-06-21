@@ -49,7 +49,7 @@ const initialSources: EvidenceSourceInput[] = [
     label: "Video review",
     status: "confirmed",
     confidence: 82,
-    summary: "Visible blast effects and sustained scene change"
+    summary: "Visible blast effects and sustained impact detected"
   },
   {
     id: "source-camera",
@@ -57,7 +57,7 @@ const initialSources: EvidenceSourceInput[] = [
     label: "Public camera layer",
     status: "supporting",
     confidence: 70,
-    summary: "Public camera layer indicates change in scene brightness and persistent scene change"
+    summary: "Public camera layer indicates change in scene brightness and persistent impact detected"
   },
   {
     id: "source-audio",
@@ -86,7 +86,7 @@ const initialTimeline = [
   {
     time: "T+15m",
     label: "Camera sweep",
-    detail: "Public camera layer reviewed for flash or scene-change indicators."
+    detail: "Public camera layer reviewed for flash or impact-detected indicators."
   },
   {
     time: "T+60m",
