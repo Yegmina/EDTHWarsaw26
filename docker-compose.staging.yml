@@ -1,0 +1,6 @@
+services:
+  web:
+    environment:
+      APP_ENV: staging
+    ports:
+      - "8102:3000"

@@ -1,0 +1,15 @@
+.git
+.github
+.next
+node_modules
+data
+out
+dist
+build
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.playwright-cli
+output

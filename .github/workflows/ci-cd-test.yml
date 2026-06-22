@@ -1,0 +1,52 @@
+name: ci-cd-test
+
+on:
+  push:
+    branches:
+      - ci-cd-test
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-test
+  cancel-in-progress: true
+
+jobs:
+  deploy_and_test:
+    runs-on: [self-hosted, linux, x64, edthwarsaw26]
+    environment: serverenv
+    defaults:
+      run:
+        working-directory: repo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          path: repo
+
+      - name: Ensure Docker is ready
+        run: docker info >/dev/null
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy ci-cd-test environment
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RUNTIME_BASE_DIR: /home/dev/actions-runner-edthwarsaw26/_runtime
+          COMMIT_SHA: ${{ github.sha }}
+        run: ./scripts/deploy_env.sh ci-cd-test docker-compose.cicd-test.yml 3600
+
+      - name: Wait for health
+        run: ./scripts/wait_for_health.sh http://127.0.0.1:8103 300
+
+      - name: Run smoke test suite
+        env:
+          BASE_URL: http://127.0.0.1:8103
+        run: node scripts/smoke_deployment.mjs

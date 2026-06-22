@@ -1,0 +1,6 @@
+services:
+  web:
+    environment:
+      APP_ENV: ci-cd-test
+    ports:
+      - "8103:3000"
